@@ -10,10 +10,12 @@ import (
 
 
 func CloneRepository(url string) (string, error) {
+	//path to store the repository files 
 	destPath := filepath.Join(os.TempDir(), uuid.New().String())
 
 	fmt.Println("cloning repository:", url, "→", destPath)
 
+	//executing git clone command
 	cmd := exec.Command("git", "clone", url, destPath)
 	output, err := cmd.CombinedOutput()
 
