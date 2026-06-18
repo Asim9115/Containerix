@@ -38,7 +38,7 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(temporaryPath)
 
 	//3. scan the code
-	result, err := scanner.Scan(temporaryPath)
+	result, err := scanner.ScanFiles(temporaryPath)
 	if err != nil {
 		Error(w, http.StatusInternalServerError, "scan failed")
 		return
@@ -50,7 +50,7 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 
 
 	//4. Detect the language
-	detected := detector.Detect(temporaryPath)
+	detected := detector.DetectLanguage(temporaryPath)
 	if detected == detector.LangUnknown {
 		Error(w, http.StatusBadRequest, "cannot detect language")
 		return
