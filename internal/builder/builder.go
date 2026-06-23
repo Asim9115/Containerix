@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"github.com/asim9115/containerix/internal/detector"
+	"github.com/asim9115/containerix/internal/dockerfile"
 )
 
 
@@ -46,14 +47,19 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 		return tag, nil
 	}
 
+	var (
+		content string
+		err 	error
+	)
 	//Generate Dockerfile based on detected language
 	switch detected.Language {
 	case detector.LangNode:
-		// Node.js Dockerfile
+		content, err = GenerateNode(detected)
+		
 	case detector.LangPython:
-		// Python Dockerfile
+		content, err = dockerfile.GeneratePython(detected)
 	case detector.LangGo:
-		// Go Dockerfile
+		content, err = dockerfile.GenerateGo(detected)
 	default:
 		return "", fmt.Errorf("unsupported language: %s", detected.Language)
 	}
