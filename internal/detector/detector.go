@@ -1,15 +1,16 @@
-package builder
+package detector
 
 import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 type Language string
 
 const (
-	LangDockerFile Language = "dockerfile"
+	LangDockerfile Language = "dockerfile"
 	LangNode       Language = "node"
 	LangPython     Language = "python"
 	LangGo         Language = "go"
@@ -21,7 +22,7 @@ const (
 
 type DetectResult struct {
 	Language Language
-	HasDockerFile bool
+	HasDockerfile bool
 	DockerFilePath string
 	Framework string
 	Version string
@@ -42,9 +43,9 @@ func Detect(repoPath string) DetectResult {
 
 	dockerfilepath := filepath.Join(repoPath, "Dockerfile")
 	if fileExists(dockerfilepath) {
-		result.HasDockerFile = true
+		result.HasDockerfile = true
 		result.DockerFilePath = dockerfilepath
-		result.Language = LangDockerFile
+		result.Language = LangDockerfile
 		return result
 	}
 
@@ -76,12 +77,66 @@ func Detect(repoPath string) DetectResult {
 
 	if result.Language == LangNode {
 		pkg, err := readPackageJson(repoPath)
+		if err == nil {
+			result.Framework = detectFramework(pkg)
+			result.Version = detectNodeVersion(pkg)
+		} else {
+			result.Framework = "generic-node"
+			result.Version = "20"
+		}
 	}
+	return result
+}
+
+func detectFramework(pkg *PackageJSON) string {
+	if _, ok := pkg.Dependencies["next"]; ok {
+		return "nextjs"
+	}
+	if _, ok := pkg.DevDependencies["vite"]; ok {
+		return "vite"
+	}
+	if _, ok := pkg.Dependencies["react-scripts"]; ok {
+		return "cra"
+	}
+	if _, ok := pkg.Dependencies["express"]; ok {
+		return "express"
+	}
+	if _, ok := pkg.Dependencies["fastify"]; ok {
+		return "express"
+	}
+	return "generic-node"
+}
+
+func detectNodeVersion(pkg *PackageJSON) string {
+	raw, ok := pkg.Engines["node"]
+	if !ok || raw == "" {
+		return "20"
+	}
+
+	// strip symbols like >=, ^, ~, spaces — keep only the major version number
+	re := regexp.MustCompile(`\d+`)
+	match := re.FindString(raw)
+	if match == "" {
+		return "20"
+	}
+
+	return match
 }
 
 
-func readPackageJson(path string) (*PackageJSON, error) {
-	
+func readPackageJson(repoPath string) (*PackageJSON, error) {
+	path := filepath.Join(repoPath, "package.json")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var pkg PackageJSON
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil, err
+	}
+
+	return &pkg, nil
 }
 
 func fileExists(path string) bool {

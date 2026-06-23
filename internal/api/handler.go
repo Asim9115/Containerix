@@ -50,14 +50,14 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 
 
 	//4. Detect the language
-	detected := detector.DetectLanguage(temporaryPath)
-	if detected == detector.LangUnknown {
+	detected := detector.Detect(temporaryPath)
+	if detected.Language == detector.LangUnknown {
 		Error(w, http.StatusBadRequest, "cannot detect language")
 		return
 	}
 
 	//5. build docker image
-	imageId, err := builder.BuildDockerImage(temporaryPath, detected.Language)
+	imageId, err := builder.BuildDockerImage(temporaryPath, detected)
 	if err != nil {
     Error(w, http.StatusInternalServerError, "docker build failed")
     return
