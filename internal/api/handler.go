@@ -58,11 +58,13 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("language detected proceeding to build")
 	//5. build docker image
 	imageId, err := builder.BuildDockerImage(temporaryPath, detected)
-	log.Fatal(err)
 	if err != nil {
-    Error(w, http.StatusInternalServerError, "docker build failed")
-    return
+		log.Println("docker build error:", err)
+		Error(w, http.StatusInternalServerError, "docker build failed")
+		return
 	}
 
+	//Cleanup
+	//defer os.RemoveAll(temporaryPath)
 	JSON(w, http.StatusOK, map[string]string{"image_id" : imageId})
 }

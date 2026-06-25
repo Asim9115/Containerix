@@ -18,7 +18,7 @@ func GenerateGo(detected detector.DetectResult) (string, error) {
 		version = "1.26.2"
 	}
 
-	content := fmt.Sprintf(`FROM golang:%s
+	content := fmt.Sprintf(`FROM golang:%s AS builder
 
 WORKDIR /app
 
@@ -27,11 +27,18 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o app ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -ldflags="-s -w" \
+    -o app ./cmd/server
+
+# Runtime stage
+FROM gcr.io/distroless/static-debian12
+
+COPY --from=builder /app/app /app
 
 EXPOSE 8000
 
-CMD ["./app"]
+ENTRYPOINT ["/app"]
 `, version)
 
 	return content, nil
