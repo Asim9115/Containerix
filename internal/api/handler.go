@@ -2,13 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
-
+"fmt"
 	"github.com/asim9115/containerix/internal/builder"
-	"github.com/asim9115/containerix/internal/scanner"
+	// "github.com/asim9115/containerix/internal/scanner"
 	"github.com/asim9115/containerix/internal/detector"
-
 )
 
 type githubUrl struct{
@@ -38,15 +38,15 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(temporaryPath)
 
 	//3. scan the code
-	result, err := scanner.ScanFiles(temporaryPath)
-	if err != nil {
-		Error(w, http.StatusInternalServerError, "scan failed")
-		return
-	}
-	if !result.Clean {
-		Error(w, http.StatusBadRequest, result.Error())
-		return
-	}
+	// result, err := scanner.ScanFiles(temporaryPath)
+	// if err != nil {
+	// 	Error(w, http.StatusInternalServerError, "scan failed")
+	// 	return
+	// }
+	// if !result.Clean {
+	// 	Error(w, http.StatusBadRequest, result.Error())
+	// 	return
+	// }
 
 
 	//4. Detect the language
@@ -55,9 +55,10 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "cannot detect language")
 		return
 	}
-
+	fmt.Println("language detected proceeding to build")
 	//5. build docker image
 	imageId, err := builder.BuildDockerImage(temporaryPath, detected)
+	log.Fatal(err)
 	if err != nil {
     Error(w, http.StatusInternalServerError, "docker build failed")
     return

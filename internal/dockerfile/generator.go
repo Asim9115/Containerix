@@ -5,11 +5,17 @@ import (
 	"github.com/asim9115/containerix/internal/detector"
 )
 
+
+func GenerateNode(detected detector.DetectResult) (string, error) {
+	return "", nil
+}
+
+
 func GenerateGo(detected detector.DetectResult) (string, error) {
 
 	version := detected.Version
 	if version == "" {
-		version = "1.24"
+		version = "1.26.2"
 	}
 
 	content := fmt.Sprintf(`FROM golang:%s
@@ -21,9 +27,9 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o app .
+RUN go build -o app ./cmd/server
 
-EXPOSE 8080
+EXPOSE 8000
 
 CMD ["./app"]
 `, version)
