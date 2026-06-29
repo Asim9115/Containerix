@@ -11,3 +11,10 @@ type Sandbox struct {
 	Containers map[string]*container.Container
 }
 
+type Stats struct {
+	Cpu float64
+	UsedCpu float64
+	Memory string
+	UsedMemory string
+	Containers int
+}
