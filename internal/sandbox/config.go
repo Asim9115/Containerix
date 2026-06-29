@@ -2,6 +2,8 @@ package sandbox
 
 import "github.com/asim9115/containerix/internal/container"
 
+const cgroupRoot =  "/sys/fs/cgroup" 
+
 type Sandbox struct {
 	Name   string
 	Cpu    float64
