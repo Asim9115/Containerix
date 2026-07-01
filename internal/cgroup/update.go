@@ -15,19 +15,25 @@ func Update(name string, cpu float64, memory string, rootpath string) error {
 		[]byte(memory),
 		0644,
 	); err != nil {
-		return fmt.Errorf("memory limit %w", err)
+		return fmt.Errorf("update memory limit %w", err)
 	}
 
-	quota := cpu * 100000
-	cpuMax := fmt.Sprintf("%f 100000", quota)
-	//set cpu limit
-	if err := os.WriteFile(
-		filepath.Join(path, "cpu.max"),
-		[]byte(cpuMax),
-		0644,
-	); err != nil {
-		return fmt.Errorf("Cpu limit: %w", err)
-	}
+    // CPU limit
+    var cpuMax string
+    if cpu <= 0 {
+        cpuMax = "max 100000"
+    } else {
+        quota := int64(cpu * 100000)
+        cpuMax = fmt.Sprintf("%d 100000", quota)
+    }
+
+    if err := os.WriteFile(
+        filepath.Join(path, "cpu.max"),
+        []byte(cpuMax),
+        0644,
+    ); err != nil {
+        return fmt.Errorf("update CPU limit: %w", err)
+    }
 
 	return nil
 

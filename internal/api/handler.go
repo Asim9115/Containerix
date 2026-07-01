@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-"fmt"
+	"fmt"
 	"github.com/asim9115/containerix/internal/builder"
-	// "github.com/asim9115/containerix/internal/scanner"
 	"github.com/asim9115/containerix/internal/detector"
+	"github.com/asim9115/containerix/internal/state"
 )
 
 type githubUrl struct{
@@ -67,4 +67,34 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	//Cleanup
 	//defer os.RemoveAll(temporaryPath)
 	JSON(w, http.StatusOK, map[string]string{"image_id" : imageId})
+}
+
+
+func Cgroup(w http.ResponseWriter, r *http.Request) {
+	
+	switch r.Method {
+	case http.MethodDelete:
+		handleDelete(w, r)
+		return
+	
+	case http.MethodGet:
+		handleGet(w, r)
+		return
+	default:
+		Error(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func handleDelete(w http.ResponseWriter, r *http.Request) {
+	_ = state.SB
+	err := state.SB.Sandbox.Destroy()
+	if err != nil {
+		Error(w, http.StatusConflict, err.Error())
+		return
+	}
+	JSON(w, http.StatusOK, map[string]string{"Task" :"completed" })
+}
+
+func handleGet(w http.ResponseWriter, r *http.Request) {
+	JSON(w, http.StatusOK, state.SB.Sandbox.Stats())
 }
