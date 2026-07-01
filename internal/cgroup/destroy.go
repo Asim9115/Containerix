@@ -6,7 +6,7 @@ import (
 )
 
 func Destroy(name string, path string) error {
-	err := os.Remove(path)
+	err := os.RemoveAll(path)
 
 	if err != nil {
 		return fmt.Errorf("Failed to delete cgroup {%w}\n",err)

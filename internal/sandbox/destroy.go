@@ -7,7 +7,7 @@ import (
 func (s *Sandbox) Destroy() error {
 	name := s.Name
 	containers := len(s.Containers)
-	path := cgroupRoot
+	path := CgroupRoot
 	if containers != 0 {
 		//stop all containers before destroying the cgroup
 

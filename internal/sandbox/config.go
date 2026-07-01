@@ -2,7 +2,7 @@ package sandbox
 
 import "github.com/asim9115/containerix/internal/container"
 
-const cgroupRoot =  "/sys/fs/cgroup" 
+const CgroupRoot =  "/sys/fs/cgroup" 
 
 type Sandbox struct {
 	Name   string
