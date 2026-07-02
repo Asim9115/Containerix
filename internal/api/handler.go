@@ -35,7 +35,7 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusBadRequest, "Cannot clone github repository")
 		return
 	}
-	defer os.RemoveAll(temporaryPath)
+	
 
 	//3. scan the code
 	// result, err := scanner.ScanFiles(temporaryPath)
@@ -66,7 +66,7 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 
 	//Cleanup
 	defer os.RemoveAll(temporaryPath)
-	JSON(w, http.StatusOK, map[string]string{"image_id" : imageId})
+	
 
 	//check resouce availability
 	err = state.SB.Sandbox.CheckResource(0.5, "524288000")
@@ -81,7 +81,7 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	//update sandbox
 
 	//stream logs
-	
+	JSON(w, http.StatusOK, map[string]string{"image_id" : imageId})
 }
 
 

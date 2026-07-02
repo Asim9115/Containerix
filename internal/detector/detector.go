@@ -102,7 +102,7 @@ func detectFramework(pkg *PackageJSON) string {
 		return "express"
 	}
 	if _, ok := pkg.Dependencies["fastify"]; ok {
-		return "express"
+		return "fastify"
 	}
 	return "generic-node"
 }
