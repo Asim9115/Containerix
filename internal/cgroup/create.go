@@ -27,7 +27,7 @@ func Create(name string, cpu float64, memory string) error {
 	}
 
 	quota := cpu * 100000
-	cpuMax := fmt.Sprintf("%f 100000", quota)
+	cpuMax := fmt.Sprintf("%.0f 100000", quota)
 	//set cpu limit
 	if err := os.WriteFile(
 		filepath.Join(path, "cpu.max"),

@@ -2,21 +2,22 @@ package sandbox
 
 import "github.com/asim9115/containerix/internal/container"
 
-const CgroupRoot =  "/sys/fs/cgroup" 
+const CgroupRoot = "/sys/fs/cgroup"
 
 type Sandbox struct {
-	Name   string
-	Cpu    float64
-	Memory string
-	UsedCpu float64
-	UsedMemory string
-	Containers map[string]*container.Container
+	Name       string                          `json:"name"`
+	Cpu        float64                         `json:"cpu"`
+	Memory     string                          `json:"memory"`
+	UsedCpu    float64                         `json:"usedcpu"`
+	UsedMemory string                          `json:"usedmemory"`
+	Containers map[string]*container.Container `json:"containers"`
 }
 
 type Stats struct {
-	Cpu float64
-	UsedCpu float64
-	Memory string
-	UsedMemory string
-	Containers int
+	Cpu        float64 `json:"cpu"`
+	UsedCpu    float64 `json:"usedcpu"`
+	Memory     string  `json:"memory"`
+	UsedMemory string  `json:"usedmemory"`
+	Containers int     `json:"containers"`
 }
+

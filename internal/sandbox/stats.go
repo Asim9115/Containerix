@@ -2,7 +2,7 @@ package sandbox
 
 func (s *Sandbox) Stats() Stats {
 	return Stats{
-		Cpu : s.Cpu,
+		Cpu : s.Cpu, 
 		UsedCpu: s.UsedCpu,
 		Memory: s.Memory,
 		UsedMemory: s.UsedMemory,

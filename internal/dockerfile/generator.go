@@ -29,7 +29,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux \
     go build -ldflags="-s -w" \
-    -o app ./cmd/server
+    -o app main.go
 
 # Runtime stage
 FROM gcr.io/distroless/static-debian12

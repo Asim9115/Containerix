@@ -80,6 +80,8 @@ func Cgroup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		handleGet(w, r)
 		return
+	case http.MethodPatch:
+		handlePatch(w, r)
 	default:
 		Error(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
@@ -97,4 +99,12 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 
 func handleGet(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, state.SB.Sandbox.Stats())
+}
+
+func handlePatch(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		Error(w, http.StatusBadRequest, "No data found")
+	}
+
+	
 }

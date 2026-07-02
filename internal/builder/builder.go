@@ -2,26 +2,35 @@ package builder
 
 import (
 	"fmt"
-	"os/exec"
-	"github.com/google/uuid"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"net/url"
 	"github.com/asim9115/containerix/internal/detector"
 	"github.com/asim9115/containerix/internal/dockerfile"
+	"github.com/google/uuid"
 )
 
 
-func CloneRepository(url string) (string, error) {
+func CloneRepository(repoUrl string) (string, error) {
+
+	//validate url
+
+	if err := ValidateRepoUrl(repoUrl); err != nil {
+		return "", err
+	}
+
 	//path to store the repository files 
 	destPath := filepath.Join("tmp", uuid.New().String())
 
     if err := os.MkdirAll("tmp", 0755); err != nil {
         return "", err
     }
-	fmt.Println("cloning repository:", url, "→", destPath)
+	fmt.Println("cloning repository:", repoUrl, "→", destPath)
 
 	//executing git clone command
-	cmd := exec.Command("git", "clone", url, destPath)
+	cmd := exec.Command("git", "clone", repoUrl, destPath)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -94,4 +103,24 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 	}
 	fmt.Printf("Successfully built image %s\n", tag)
 	return tag, nil
+}
+
+func ValidateRepoUrl(repoUrl string) error {
+	//prevent option injection
+	if strings.HasPrefix(repoUrl, "-") {
+		return fmt.Errorf("invalid url")
+	}
+
+	u, err := url.Parse(repoUrl)
+
+	if err != nil {
+		return err
+	}
+
+	switch u.Scheme {
+	case "https", "http", "ssh":
+		return nil
+	default:
+		return fmt.Errorf("unsupported repository scheme: %s", u.Scheme)
+	}
 }
