@@ -65,8 +65,23 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Cleanup
-	//defer os.RemoveAll(temporaryPath)
+	defer os.RemoveAll(temporaryPath)
 	JSON(w, http.StatusOK, map[string]string{"image_id" : imageId})
+
+	//check resouce availability
+	err = state.SB.Sandbox.CheckResource(0.5, "524288000")
+	if err != nil {
+		Error(w, http.StatusUnprocessableEntity, err.Error())
+	}
+
+	//runDocker image
+
+	//add process to cgroup
+
+	//update sandbox
+
+	//stream logs
+	
 }
 
 
