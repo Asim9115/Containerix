@@ -7,6 +7,7 @@ import (
 	"github.com/asim9115/containerix/internal/sandbox"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/router"
+	"github.com/asim9115/containerix/internal/container"
 )
 
 
@@ -23,6 +24,8 @@ func main() {
 	}
 	state.SB.Sandbox = sb
 	log.Println("Sandbox ready ")
+	state.SB.Ports = container.New()
+	log.Println("Intialized port manager")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

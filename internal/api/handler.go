@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"fmt"
+
 	"github.com/asim9115/containerix/internal/builder"
 	"github.com/asim9115/containerix/internal/detector"
 	"github.com/asim9115/containerix/internal/state"
@@ -68,10 +69,10 @@ func CreateDockerImage(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(temporaryPath)
 	
 
-	//check resouce availability
-	err = state.SB.Sandbox.CheckResource(0.5, "524288000")
-	if err != nil {
+	// check resource availability
+	if err = state.SB.Sandbox.CanAllocate(0.5, "524288000"); err != nil {
 		Error(w, http.StatusUnprocessableEntity, err.Error())
+		return
 	}
 
 	//runDocker image

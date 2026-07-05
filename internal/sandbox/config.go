@@ -1,6 +1,10 @@
 package sandbox
 
-import "github.com/asim9115/containerix/internal/container"
+import (
+	"sync"
+
+	"github.com/asim9115/containerix/internal/container"
+)
 
 const CgroupRoot = "/sys/fs/cgroup"
 
@@ -11,6 +15,7 @@ type Sandbox struct {
 	UsedCpu    float64                         `json:"usedcpu"`
 	UsedMemory string                          `json:"usedmemory"`
 	Containers map[string]*container.Container `json:"containers"`
+	mu 			sync.Mutex
 }
 
 type Stats struct {
