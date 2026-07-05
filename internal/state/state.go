@@ -5,10 +5,9 @@ import (
 	"github.com/asim9115/containerix/internal/sandbox"
 )
 
-
 type Server struct {
-	Sandbox *sandbox.Sandbox
-	Ports *container.Manager
+	Sandbox sandbox.Sandbox
+	Ports   *container.Manager
 }
 
 var SB Server

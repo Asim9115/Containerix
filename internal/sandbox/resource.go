@@ -2,23 +2,24 @@ package sandbox
 
 import (
 	"fmt"
-	"strconv"	
+	"strconv"
+	"github.com/asim9115/containerix/internal/types"
 )
 
-func (s *Sandbox) CanAllocate(cpuNeeded float64, memory string) error {
+func (s *SandboxManager)CanAllocate(cpuNeeded float64, memory string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	usedMemory, err := strconv.ParseInt(s.UsedMemory, 10, 64)
 	if err != nil {
 		return err
 	}
-	totalMemory , err := strconv.ParseInt(s.Memory, 10, 64)
+	totalMemory, err := strconv.ParseInt(s.Memory, 10, 64)
 	if err != nil {
 		return err
 	}
 
-	memoryNeeded , err := strconv.ParseInt(memory, 10, 64)
-		if err != nil {
+	memoryNeeded, err := strconv.ParseInt(memory, 10, 64)
+	if err != nil {
 		return err
 	}
 
@@ -36,10 +37,10 @@ func (s *Sandbox) CanAllocate(cpuNeeded float64, memory string) error {
 	return nil
 }
 
-func (s *Sandbox)Release(cpu float64, memory string) error {
+func (s *SandboxManager) Release(cpu float64, memory string) error {
 	newCpu := s.UsedCpu - cpu
 	freeMemory, err := strconv.Atoi(memory)
-	if err !=nil {
+	if err != nil {
 		return err
 	}
 	usedMemory, err := strconv.Atoi(s.UsedMemory)
@@ -48,7 +49,6 @@ func (s *Sandbox)Release(cpu float64, memory string) error {
 	}
 	newMemory := usedMemory - freeMemory
 
-	//write the new values in Sandbox
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.UsedCpu = newCpu
@@ -56,10 +56,10 @@ func (s *Sandbox)Release(cpu float64, memory string) error {
 	return nil
 }
 
-func (s *Sandbox)Allocate(cpu float64, memory string) error {
+func (s *SandboxManager) Allocate(cpu float64, memory string) error {
 	newCpu := s.UsedCpu + cpu
 	addMemory, err := strconv.Atoi(memory)
-	if err !=nil {
+	if err != nil {
 		return err
 	}
 	usedMemory, err := strconv.Atoi(s.UsedMemory)
@@ -68,7 +68,6 @@ func (s *Sandbox)Allocate(cpu float64, memory string) error {
 	}
 	newMemory := usedMemory + addMemory
 
-	//write the new values in Sandbox
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.UsedCpu = newCpu
@@ -76,6 +75,6 @@ func (s *Sandbox)Allocate(cpu float64, memory string) error {
 	return nil
 }
 
-func (s *Sandbox) Remaining() Stats  {
+func (s *SandboxManager) Remaining() types.Stats {
 	return s.Stats()
 }

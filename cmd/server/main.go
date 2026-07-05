@@ -22,8 +22,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	state.SB.Sandbox = sb
-	log.Println("Sandbox ready ")
+	
+	log.Println("Sandbox ready ", sb)
 	state.SB.Ports = container.New()
 	log.Println("Intialized port manager")
 	port := os.Getenv("PORT")

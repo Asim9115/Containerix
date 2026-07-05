@@ -2,27 +2,22 @@ package sandbox
 
 import (
 	"sync"
-
-	"github.com/asim9115/containerix/internal/container"
+	"github.com/asim9115/containerix/internal/types"
 )
 
 const CgroupRoot = "/sys/fs/cgroup"
 
-type Sandbox struct {
-	Name       string                          `json:"name"`
-	Cpu        float64                         `json:"cpu"`
-	Memory     string                          `json:"memory"`
-	UsedCpu    float64                         `json:"usedcpu"`
-	UsedMemory string                          `json:"usedmemory"`
-	Containers map[string]*container.Container `json:"containers"`
-	mu 			sync.Mutex
+type Sandbox interface {
+	CanAllocate(cpuNeeded float64, memory string) error
+	Allocate(cpu float64, memory string) error
+	Release(cpu float64, memory string) error
+	UpdateResources(cpu float64, memory string) error
+	Destroy() error
+	Stats() types.Stats
+	Remaining() types.Stats
 }
 
-type Stats struct {
-	Cpu        float64 `json:"cpu"`
-	UsedCpu    float64 `json:"usedcpu"`
-	Memory     string  `json:"memory"`
-	UsedMemory string  `json:"usedmemory"`
-	Containers int     `json:"containers"`
+type SandboxManager struct {
+	mu sync.Mutex
+	*types.Sandbox
 }
-

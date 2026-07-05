@@ -3,8 +3,8 @@ package sandbox
 import (
 	"github.com/asim9115/containerix/internal/cgroup"
 )
-func (s *Sandbox) UpdateResources(cpu float64, memory string) error {
 
+func (s *SandboxManager) UpdateResources(cpu float64, memory string) error {
 	err := cgroup.Update(s.Name, cpu, memory, CgroupRoot)
 	if err != nil {
 		return err
