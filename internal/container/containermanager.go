@@ -15,25 +15,25 @@ func List(containers map[string]*types.Container) []*types.Container {
 }
 
 func Stop(id string) error {
-	// err := docker.StopContainer(id)
-	// if err != nil {
-	// 	return err
-	// }
+	err := docker.StopContainer(id)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func Start(id string) error {
-	// err := docker.StartContainer(id)
-	// if err != nil {
-	// 	return err
-	// }
+	err := docker.StartContainer(id)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func Run(cfg types.Config) error {
-	// err := docker.RunContainer(cfg)
-	// if err != nil {
-	// 	return err
-	// }
+	err := docker.RunContainer(cfg)
+	if err != nil {
+		return err
+	}
 	return nil
 }

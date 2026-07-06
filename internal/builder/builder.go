@@ -8,7 +8,7 @@ import (
 	"strings"
 	"net/url"
 	"github.com/asim9115/containerix/internal/detector"
-	"github.com/asim9115/containerix/internal/dockerfile"
+	"github.com/asim9115/containerix/internal/docker"
 	"github.com/google/uuid"
 )
 
@@ -67,12 +67,12 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 	//Generate Dockerfile based on detected language
 	switch detected.Language {
 	case detector.LangNode:
-		content, err = dockerfile.GenerateNode(detected)
+		content, err = docker.GenerateNode(detected)
 		
 	case detector.LangPython:
-		content, err = dockerfile.GeneratePython(detected)
+		content, err = docker.GeneratePython(detected)
 	case detector.LangGo:
-		content, err = dockerfile.GenerateGo(detected)
+		content, err = docker.GenerateGo(detected)
 	default:
 		return "", fmt.Errorf("unsupported language: %s", detected.Language)
 	}
