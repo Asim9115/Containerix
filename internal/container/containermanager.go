@@ -1,7 +1,9 @@
 package container
 
-import "github.com/asim9115/containerix/internal/types"
-
+import (
+	"github.com/asim9115/containerix/internal/types"
+	"github.com/asim9115/containerix/internal/docker"
+)
 type ContainerManager interface {
 	List() []*types.Container
 }
@@ -30,10 +32,19 @@ func Start(id string) error {
 	return nil
 }
 
-func Run(cfg types.Config) error {
+func Run(cfg types.Config) (types.Config, error) {
+	// Convert raw memory bytes string to docker-friendly format (e.g. "1g")
+	newMemory, exists := types.MemoryMap[cfg.Memory]
+	if !exists {
+		newMemory = "1g"
+	}
+	cfg.Memory = newMemory
+
+	// cfg.Ports must already be populated by the caller before Run is invoked
 	err := docker.RunContainer(cfg)
 	if err != nil {
-		return err
+		return cfg, err
 	}
-	return nil
+
+	return cfg, nil
 }

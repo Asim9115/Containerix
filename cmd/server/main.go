@@ -4,28 +4,18 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"github.com/asim9115/containerix/internal/sandbox"
+
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/router"
-	"github.com/asim9115/containerix/internal/container"
 )
 
-
-
 func main() {
-		//intialize sandbox
-	sb, err := sandbox.Init(
-		"containerix",
-		2,
-		"3221225472",
-	)
-	if err != nil {
+	// Initialize global state: sandbox cgroup + port manager
+	if err := state.Init("containerix", 2, "3221225472"); err != nil {
 		log.Fatal(err)
 	}
-	
-	log.Println("Sandbox ready ", sb)
-	state.SB.Ports = container.New()
-	log.Println("Intialized port manager")
+	log.Println("Sandbox and port manager ready")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -33,6 +23,4 @@ func main() {
 
 	log.Println("starting containerix on port", port)
 	log.Fatal(http.ListenAndServe(":"+port, router.NewRouter()))
-	
-
 }

@@ -9,9 +9,12 @@ import (
 //create a sandbox type environment to run containers with given resources
 func Init(name string, cpu float64, memory string) (Sandbox, error) {
 	sandboxData := &types.Sandbox{
-		Name:   name,
-		Cpu:    cpu,
-		Memory: memory,
+		Name:       name,
+		Cpu:        cpu,
+		Memory:     memory,
+		UsedMemory: "0",
+		UsedCpu:    0,
+		Containers: make(map[string]*types.Container),
 	}
 	fmt.Println("Intializing Sandbox")
 	fmt.Println("Name:", sandboxData.Name)

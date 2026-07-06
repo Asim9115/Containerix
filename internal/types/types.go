@@ -51,3 +51,14 @@ type Container struct {
 	Config Config
 	Status string
 }
+
+var MemoryMap = map[string]string{
+	"524288000": "500m", // 500 MB
+	"1073741824": "1g",   // 1.0 GB
+	"1610612736": "1.5g", // 1.5 GB
+	"2147483648": "2g",   // 2.0 GB
+	"2684354560": "2.5g", // 2.5 GB
+	"3221225472": "3g",   // 3.0 GB
+	"3758096384": "3.5g", // 3.5 GB
+	"4294967296": "4g",   // 4.0 GB
+}
