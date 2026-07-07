@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/state"
 )
@@ -63,7 +64,8 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGet(w http.ResponseWriter, r *http.Request) {
-	JSON(w, http.StatusOK, state.SB.Sandbox.Stats())
+	// Clean, direct, and safe!
+	JSON(w, http.StatusOK, state.SB.Sandbox.GetState())
 }
 
 func handlePatch(w http.ResponseWriter, r *http.Request) {

@@ -15,6 +15,7 @@ type Sandbox interface {
 	Destroy() error
 	Stats() types.Stats
 	Remaining() types.Stats
+	GetState() *types.Sandbox
 }
 
 type SandboxManager struct {
