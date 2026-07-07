@@ -15,12 +15,6 @@ import (
 
 func CloneRepository(repoUrl string) (string, error) {
 
-	//validate url
-
-	if err := ValidateRepoUrl(repoUrl); err != nil {
-		return "", err
-	}
-
 	//path to store the repository files 
 	destPath := filepath.Join("tmp", uuid.New().String())
 

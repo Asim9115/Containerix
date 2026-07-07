@@ -1,27 +1,26 @@
 package cgroup
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 )
 
-func AddProcess(pid int) error {
-	path := filepath.Join(cgroupRoot, "containerix/cgroup.procs")
-	//convert int to string
+func AddProcess(sandboxName string, pid int) error {
+	// path: /sys/fs/cgroup/<sandboxName>/cgroup.procs
+	path := filepath.Join(cgroupRoot, sandboxName, "cgroup.procs")
+
 	processId := strconv.Itoa(pid)
 
-	//open write writeonly and append data to the end
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
-
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open cgroup.procs for sandbox %q: %w", sandboxName, err)
 	}
-	//close file after all operation
 	defer file.Close()
-	//write the process
+
 	if _, err := file.WriteString(processId); err != nil {
-		return err
+		return fmt.Errorf("failed to write pid %d to cgroup: %w", pid, err)
 	}
 
 	return nil

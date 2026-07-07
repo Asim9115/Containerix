@@ -6,7 +6,7 @@ import (
 	"github.com/asim9115/containerix/internal/cgroup"
 )
 
-//create a sandbox type environment to run containers with given resources
+// create a sandbox type environment to run containers with given resources
 func Init(name string, cpu float64, memory string) (Sandbox, error) {
 	sandboxData := &types.Sandbox{
 		Name:       name,
@@ -16,12 +16,12 @@ func Init(name string, cpu float64, memory string) (Sandbox, error) {
 		UsedCpu:    0,
 		Containers: make(map[string]*types.Container),
 	}
-	fmt.Println("Intializing Sandbox")
+	fmt.Println("Initializing Sandbox")
 	fmt.Println("Name:", sandboxData.Name)
 	fmt.Println("CPU:", sandboxData.Cpu)
 	fmt.Println("RAM:", sandboxData.Memory)
 
-	//create cgroup
+	// create cgroup
 	err := cgroup.Create(name, cpu, memory)
 	if err != nil {
 		return nil, err

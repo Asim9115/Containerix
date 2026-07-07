@@ -22,7 +22,7 @@ func Init(name string, cpu float64, memory string) error {
 		return fmt.Errorf("state: failed to initialize sandbox: %w", err)
 	}
 
-	SB.Sandbox = sb
+	SB.Sandbox = sb          // ← assign to the interface field
 	SB.Ports = container.New()
 	return nil
 }
