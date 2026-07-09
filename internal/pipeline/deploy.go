@@ -13,38 +13,38 @@ import (
 )
 
 func Deploy(jobId string, url string) (string, error){
+
+	//1. Check sandbox resources
+	log.Print("checking sandbox resources")
+	err := state.SB.Sandbox.CanAllocate(0.5, "524288000")
+	if err != nil {
+		return "", err
+	}
 	log.Printf("validating url : %s", url)
 
-	//1. Validate url from url injection
+	//2. Validate url from url injection
 	if err := builder.ValidateRepoUrl(url); err != nil {
 		return "", err
 	}
 	log.Printf("Cloning Repo : %s", url)
 
-	//2. Clone the repository
+	//3. Clone the repository
 	path , err:= builder.CloneRepository(url); 
 	if err != nil {
 		return "", err
 	}
 	log.Print("Detecting Language")
 
-	//3. Detect Language or DockerFile
+	//4. Detect Language or DockerFile
 	result := detector.Detect(path)
 	log.Printf("Building Docker image")
 
-	//4. Build Docker Image
+	//5. Build Docker Image
 	tag, err := builder.BuildDockerImage(path, result)
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(path)
-	log.Print("checking sandbox resources")
-
-	//5. Check sandbox resources
-	err = state.SB.Sandbox.CanAllocate(0.5, "524288000")
-	if err != nil {
-		return "", err
-	}
 
 	//6. get free port
 	hostPort, err := state.SB.Ports.GetFreePort()

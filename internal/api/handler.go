@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/asim9115/containerix/internal/container"
@@ -61,6 +62,7 @@ func handleDelete(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusConflict, err.Error())
 		return
 	}
+	log.Println("c group deleted")
 	JSON(w, http.StatusOK, map[string]string{"Task" :"completed" })
 }
 

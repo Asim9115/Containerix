@@ -1,6 +1,7 @@
 package cgroup
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
@@ -10,6 +11,7 @@ import (
 
 // Destroy stops all containers then removes the cgroup directory.
 func Destroy(name string, rootpath string, containers map[string]*types.Container) error {
+	log.Println("destroy cgroup : stopping all containers")
 	container.StopAll(containers)
 	path := filepath.Join(rootpath, name)
 	return os.RemoveAll(path)
