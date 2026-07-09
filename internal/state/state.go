@@ -3,13 +3,13 @@ package state
 import (
 	"fmt"
 
-	"github.com/asim9115/containerix/internal/container"
+	"github.com/asim9115/containerix/internal/ports"
 	"github.com/asim9115/containerix/internal/sandbox"
 )
 
 type Server struct {
 	Sandbox sandbox.Sandbox
-	Ports   *container.Manager
+	Ports   *ports.Manager
 }
 
 var SB Server
@@ -22,7 +22,7 @@ func Init(name string, cpu float64, memory string) error {
 		return fmt.Errorf("state: failed to initialize sandbox: %w", err)
 	}
 
-	SB.Sandbox = sb          // ← assign to the interface field
-	SB.Ports = container.New()
+	SB.Sandbox = sb
+	SB.Ports = ports.New()
 	return nil
 }

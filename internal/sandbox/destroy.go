@@ -2,7 +2,6 @@ package sandbox
 
 import (
 	"fmt"
-
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/types"
 )
@@ -16,7 +15,7 @@ func (s *SandboxManager) Destroy() error {
 
 	name := s.Name
 	path := CgroupRoot
-	err := cgroup.Destroy(name, path)
+	err := cgroup.Destroy(name, path, s.Containers)
 	if err != nil {
 		return err
 	}

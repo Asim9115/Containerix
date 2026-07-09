@@ -11,6 +11,7 @@ func NewRouter() *mux.Router {
 	r.HandleFunc("/build", api.CreateDockerImage).Methods("POST")
 	r.HandleFunc("/cgroup", api.Cgroup).Methods("GET","DELETE", "PATCH")
 	r.HandleFunc("/containers", api.Containers).Methods("GET")
+	r.HandleFunc("/containers/stopall", api.StopContainers).Methods("GET")
 
 	return r
 }

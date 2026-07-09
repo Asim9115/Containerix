@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/state"
 )
@@ -78,4 +79,8 @@ func handlePatch(w http.ResponseWriter, r *http.Request) {
 
 func Containers(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, state.SB.Sandbox.GetState().Containers)
+}
+
+func StopContainers(w http.ResponseWriter, r *http.Request) {
+	JSON(w, http.StatusAccepted, container.StopAll(state.SB.Sandbox.GetState().Containers))
 }

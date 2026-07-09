@@ -14,10 +14,7 @@ type Sandbox struct {
 	mu         sync.Mutex
 }
 
-
-
 type Stats struct {
-
 	Cpu        float64 `json:"cpu"`
 	UsedCpu    float64 `json:"usedcpu"`
 	Memory     string  `json:"memory"`

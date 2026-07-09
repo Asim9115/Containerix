@@ -1,17 +1,16 @@
 package cgroup
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/asim9115/containerix/internal/container"
+	"github.com/asim9115/containerix/internal/types"
 )
 
-func Destroy(name string, rootpath string) error {
+// Destroy stops all containers then removes the cgroup directory.
+func Destroy(name string, rootpath string, containers map[string]*types.Container) error {
+	container.StopAll(containers)
 	path := filepath.Join(rootpath, name)
-	err := os.Remove(path)
-
-	if err != nil {
-		return fmt.Errorf("Failed to delete cgroup {%w}\n",err)
-	}
-	return nil
+	return os.RemoveAll(path)
 }

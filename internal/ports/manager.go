@@ -1,4 +1,4 @@
-package container
+package ports
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ func (m *Manager) AllocatePort(containerId string, hostPort int, containerPort i
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	//auto assign free port
+	// auto assign free port
 	if hostPort == 0 {
 		freePort, err := m.getFreePortLocked()
 		if err != nil {
@@ -55,10 +55,9 @@ func (m *Manager) AllocatePort(containerId string, hostPort int, containerPort i
 	}
 
 	address := fmt.Sprintf(":%d", hostPort)
-
 	ln, err := net.Listen("tcp", address)
 	if err != nil {
-		return 0, fmt.Errorf("host port %d already in used", hostPort)
+		return 0, fmt.Errorf("host port %d already in use", hostPort)
 	}
 	ln.Close()
 
@@ -101,7 +100,6 @@ func (m *Manager) getFreePortLocked() (int, error) {
 		}
 
 		address := fmt.Sprintf(":%d", port)
-
 		ln, err := net.Listen("tcp", address)
 		if err != nil {
 			continue
@@ -110,7 +108,7 @@ func (m *Manager) getFreePortLocked() (int, error) {
 
 		return port, nil
 	}
-	return 0, fmt.Errorf("NO free ports available")
+	return 0, fmt.Errorf("no free ports available in range %d-%d", StartPort, EndPort)
 }
 
 func (m *Manager) Reserve(containerId string, hostPort int, containerPort int) error {

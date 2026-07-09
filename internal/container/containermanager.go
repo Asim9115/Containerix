@@ -1,9 +1,12 @@
 package container
 
 import (
-	"github.com/asim9115/containerix/internal/types"
+	"log"
+
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/types"
 )
+
 type ContainerManager interface {
 	List() []*types.Container
 }
@@ -47,4 +50,18 @@ func Run(cfg types.Config) (types.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// StopAll stops all containers given a map of containers.
+// The caller is responsible for providing the container map (do not read from global state here).
+func StopAll(containers map[string]*types.Container) map[string]*types.Container{
+	for _, c := range containers {
+		err := Stop(c.ID)
+		if err != nil {
+			log.Printf("failed to stop container %s: %v", c.ID, err)
+			continue
+		}
+		c.Status = "stopped"
+	}
+	return containers
 }
