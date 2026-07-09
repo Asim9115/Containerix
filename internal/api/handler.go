@@ -75,3 +75,7 @@ func handlePatch(w http.ResponseWriter, r *http.Request) {
 
 	
 }
+
+func Containers(w http.ResponseWriter, r *http.Request) {
+	JSON(w, http.StatusOK, state.SB.Sandbox.GetState().Containers)
+}
