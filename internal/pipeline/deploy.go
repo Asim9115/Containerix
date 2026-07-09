@@ -90,12 +90,12 @@ func Deploy(jobId string, url string) (string, error){
 	state.SB.Sandbox.Allocate(0.5, "524288000")
 	
 	//12. store container in sandbox state cleanly
-	state.SB.Sandbox.GetState().Containers[cfg.Name] = &types.Container{
+	state.SB.Sandbox.AddContainer(&types.Container{
 		ID:     cfg.Name,
 		Config: cfg,
 		Status: "running",
-	}
-	
+	})
+
 	//13. Return container id and host port
 	return cfg.Name, nil
 }
