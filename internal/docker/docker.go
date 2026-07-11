@@ -9,20 +9,24 @@ import (
 	"github.com/asim9115/containerix/internal/types"
 )
 func RunContainer(cfg types.Config) error {
-	memory := cfg.Memory
-	cpu := strconv.FormatFloat(cfg.Cpu, 'f', 2, 64)
-	name := cfg.Name
 	hostPort := cfg.Ports[0].HostPort
 	containerPort := cfg.Ports[0].ContainerPort
 	port := fmt.Sprintf("%d:%d", hostPort, containerPort)
 
-	cmd := exec.Command("docker", "run", "-d",
-		"-p", port,
-		"--cpus", cpu,
-		"--memory", memory,
-		"--name", name,
-		cfg.Image,
-	)
+	cmd := exec.Command(
+    "docker",
+    "run",
+    "-d",
+    "--name", cfg.Name,
+    "-p", port,
+    "--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
+    "--memory", cfg.Tier.Memory,
+    "--memory-swap", cfg.Tier.Memory,
+    "--pids-limit", strconv.Itoa(cfg.Tier.PidsLimit),
+    "--security-opt", "no-new-privileges",
+    "--read-only",
+    cfg.Image,
+)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to start container: %s (err: %w)", string(output), err)

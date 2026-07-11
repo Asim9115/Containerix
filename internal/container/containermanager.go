@@ -36,12 +36,6 @@ func Start(id string) error {
 }
 
 func Run(cfg types.Config) (types.Config, error) {
-	// Convert raw memory bytes string to docker-friendly format (e.g. "1g")
-	newMemory, exists := types.MemoryMap[cfg.Memory]
-	if !exists {
-		newMemory = "1g"
-	}
-	cfg.Memory = newMemory
 
 	// cfg.Ports must already be populated by the caller before Run is invoked
 	err := docker.RunContainer(cfg)
