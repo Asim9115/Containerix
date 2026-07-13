@@ -22,6 +22,7 @@ func List(containers map[string]*types.Container) []*types.Container {
 func Stop(id string) error {
 	err := docker.StopContainer(id)
 	if err != nil {
+		log.Printf("ContainerManager Error - failed to stop container %s: %v", id, err)
 		return err
 	}
 	return nil
@@ -30,6 +31,7 @@ func Stop(id string) error {
 func Start(id string) error {
 	err := docker.StartContainer(id)
 	if err != nil {
+		log.Printf("ContainerManager Error - failed to start container %s: %v", id, err)
 		return err
 	}
 	return nil
@@ -40,6 +42,7 @@ func Run(cfg types.Config) (types.Config, error) {
 	// cfg.Ports must already be populated by the caller before Run is invoked
 	err := docker.RunContainer(cfg)
 	if err != nil {
+		log.Printf("ContainerManager Error - failed to run container %s: %v", cfg.Name, err)
 		return cfg, err
 	}
 

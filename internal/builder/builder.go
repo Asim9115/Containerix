@@ -2,6 +2,7 @@ package builder
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ func CloneRepository(repoUrl string) (string, error) {
 	destPath := filepath.Join("tmp", uuid.New().String())
 
     if err := os.MkdirAll("tmp", 0755); err != nil {
+		log.Printf("Builder Error - Failed to create tmp directory: %v", err)
         return "", err
     }
 	fmt.Println("cloning repository:", repoUrl, "→", destPath)
@@ -28,6 +30,7 @@ func CloneRepository(repoUrl string) (string, error) {
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
+		log.Printf("Builder Error - Git clone failed for %s: %v. Output: %s", repoUrl, err, string(output))
 		return "", fmt.Errorf("git clone failed: %s", string(output))
 	}
 	fmt.Println("Clone success")
@@ -44,6 +47,7 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 		buildCommand := exec.Command("docker", "build", "-t", tag, temporaryPath)
 		output, err := buildCommand.CombinedOutput()
 		if err != nil {
+			log.Printf("Builder Error - Docker build failed for %s: %v. Output: %s", tag, err, string(output))
 			return "", fmt.Errorf(
 				"error building docker image: %w\n%s",
 				err,
@@ -74,11 +78,13 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 	dockerfilepath := filepath.Join(temporaryPath, "Dockerfile")
 	_, err = os.Create(dockerfilepath)
 	if err != nil {
+		log.Printf("Builder Error - Failed to create Dockerfile: %v", err)
 		return "", err
 	}
 	fmt.Println("file created")
 	err = os.WriteFile(dockerfilepath, []byte(content), 0644)
 	if err != nil {
+		log.Printf("Builder Error - Failed to write Dockerfile content: %v", err)
 		return "", err
 	}
 	fmt.Println("wrote dockerfile")
@@ -89,6 +95,7 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 	buildCommand.Stderr = os.Stderr
 	err = buildCommand.Run()
 	if err != nil {
+		log.Printf("Builder Error - Docker build failed for %s: %v", tag, err)
 		return "", fmt.Errorf(
 			"error building docker image: %w\n%s",
 			err,

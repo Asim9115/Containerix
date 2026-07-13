@@ -22,7 +22,7 @@ func Deploy(jobId string, url string) (string, error) {
 	log.Print("checking sandbox resources")
 	err := state.SB.Sandbox.CanAllocate(cpu, memory)
 	if err != nil {
-		state.SB.Sandbox.Release(cpu, memory)
+		log.Printf("Pipeline Error - Sandbox allocation failed: %v", err)
 		return "", err
 	}
 	state.SB.Sandbox.Allocate(cpu, memory)
@@ -31,6 +31,7 @@ func Deploy(jobId string, url string) (string, error) {
 
 	//2. Validate url from url injection
 	if err := builder.ValidateRepoUrl(url); err != nil {
+		log.Printf("Pipeline Error - Invalid URL %s: %v", url, err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
@@ -39,9 +40,11 @@ func Deploy(jobId string, url string) (string, error) {
 	//3. Clone the repository
 	path, err := builder.CloneRepository(url)
 	if err != nil {
+		log.Printf("Pipeline Error - Repository clone failed for %s: %v", url, err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
+	defer os.RemoveAll(path)
 	log.Print("Detecting Language")
 
 	//4. Detect Language or DockerFile
@@ -51,14 +54,15 @@ func Deploy(jobId string, url string) (string, error) {
 	//5. Build Docker Image
 	tag, err := builder.BuildDockerImage(path, result)
 	if err != nil {
+		log.Printf("Pipeline Error - Docker build failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
-	defer os.RemoveAll(path)
 
 	//6. get free port
 	hostPort, err := state.SB.Ports.GetFreePort()
 	if err != nil {
+		log.Printf("Pipeline Error - Port allocation failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
@@ -69,12 +73,12 @@ func Deploy(jobId string, url string) (string, error) {
 		Image: tag,
 		Tier:  types.Tier1,
 		Ports: []types.PortMapping{
-			{HostPort: hostPort, ContainerPort: 8000},
+			{HostPort: hostPort, ContainerPort: 5000},
 		},
 	}
 	log.Printf("config : %v", cfg)
 	//10. mark port as used
-	state.SB.Ports.Reserve(cfg.Name, hostPort, 8000)
+	state.SB.Ports.Reserve(cfg.Name, hostPort, 5000)
 
 	//11. Update sandbox resources
 
@@ -83,6 +87,7 @@ func Deploy(jobId string, url string) (string, error) {
 	// 7. Run the container
 	cfg, err = container.Run(cfg)
 	if err != nil {
+		log.Printf("Pipeline Error - Container run failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		state.SB.Ports.ReleasePort(hostPort)
 		return "", err
@@ -91,12 +96,20 @@ func Deploy(jobId string, url string) (string, error) {
 	// 8. Get PID of the running container by its name (not image tag)
 	pid, err := docker.GetPid(cfg.Name)
 	if err != nil {
+		_ = docker.StopContainer(cfg.Name)
+		state.SB.Sandbox.Release(cfg.Tier.Cpu, cfg.Tier.Memory)
+		state.SB.Ports.ReleasePort(hostPort)
+		log.Printf("Pipeline Error - Failed to get PID for %s: %v", cfg.Name, err)
 		return "", err
 	}
 	log.Printf("container pid: %d", pid)
 
 	// 9. Add container process to sandbox cgroup
 	if err := cgroup.AddProcess(state.SB.Sandbox.GetState().Name, pid); err != nil {
+		_ = docker.StopContainer(cfg.Name)
+		state.SB.Sandbox.Release(cfg.Tier.Cpu, cfg.Tier.Memory)
+		state.SB.Ports.ReleasePort(hostPort)
+		log.Printf("Pipeline Error - Failed to add process %d to cgroup: %v", pid, err)
 		return "", err
 	}
 	log.Printf("process %d added to cgroup", pid)
