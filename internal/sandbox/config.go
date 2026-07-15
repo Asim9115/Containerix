@@ -17,6 +17,7 @@ type Sandbox interface {
 	Remaining() types.Stats
 	GetState() *types.Sandbox
 	AddContainer(container *types.Container)
+	RemoveContainer(id string)
 }
 
 type SandboxManager struct {

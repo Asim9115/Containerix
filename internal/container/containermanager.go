@@ -8,7 +8,7 @@ import (
 )
 
 type ContainerManager interface {
-	List() []*types.Container
+	List(containers map[string]*types.Container) []*types.Container
 }
 
 func List(containers map[string]*types.Container) []*types.Container {
@@ -19,6 +19,8 @@ func List(containers map[string]*types.Container) []*types.Container {
 	return result
 }
 
+
+//stops a container and the kernel automatically removes the pid from cgroup.procs
 func Stop(id string) error {
 	err := docker.StopContainer(id)
 	if err != nil {
@@ -28,6 +30,7 @@ func Stop(id string) error {
 	return nil
 }
 
+//while restarting  a container we need to rewrite the pid of the container in the cgroup
 func Start(id string) error {
 	err := docker.StartContainer(id)
 	if err != nil {
@@ -61,4 +64,32 @@ func StopAll(containers map[string]*types.Container) map[string]*types.Container
 		c.Status = "stopped"
 	}
 	return containers
+}
+
+
+func DeleteContainer(container *types.Container) error {
+	log.Printf("[container.DeleteContainer] Starting deletion for id=%q status=%q", container.ID, container.Status)
+
+	if container.Status != "stopped" {
+		log.Printf("[container.DeleteContainer] Container id=%q is not stopped (status=%q), stopping first", container.ID, container.Status)
+		err := Stop(container.ID)
+		if err != nil {
+			log.Printf("[container.DeleteContainer] FAIL — could not stop container id=%q: %v", container.ID, err)
+			return err
+		}
+		container.Status = "stopped"
+		log.Printf("[container.DeleteContainer] Container id=%q stopped successfully", container.ID)
+	} else {
+		log.Printf("[container.DeleteContainer] Container id=%q already stopped, skipping stop step", container.ID)
+	}
+
+	log.Printf("[container.DeleteContainer] Calling docker.DeleteContainer for id=%q", container.ID)
+	err := docker.DeleteContainer(container.ID)
+	if err != nil {
+		log.Printf("[container.DeleteContainer] FAIL — docker.DeleteContainer id=%q: %v", container.ID, err)
+		return err
+	}
+	log.Printf("[container.DeleteContainer] docker.DeleteContainer id=%q succeeded", container.ID)
+
+	return nil
 }

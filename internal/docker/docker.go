@@ -72,3 +72,19 @@ func GetPid(tag string) (int, error) {
 	}
 	return pid, nil
 }
+
+func DeleteContainer(id string) error {
+    out, err := exec.Command("docker", "rm", id).CombinedOutput()
+    if err != nil {
+        return fmt.Errorf("docker rm failed: %v: %s", err, out)
+    }
+    return nil
+}
+
+func DeleteImage(id string) error {
+    out, err := exec.Command("docker", "rmi", id).CombinedOutput()
+    if err != nil {
+        return fmt.Errorf("docker rmi failed: %v: %s", err, out)
+    }
+    return nil
+}

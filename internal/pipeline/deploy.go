@@ -69,7 +69,7 @@ func Deploy(jobId string, url string) (string, error) {
 	log.Printf("Free Port : %d", hostPort)
 
 	cfg := types.Config{
-		Name:  "containerix-" + tag,
+		Name:  tag,
 		Image: tag,
 		Tier:  types.Tier1,
 		Ports: []types.PortMapping{

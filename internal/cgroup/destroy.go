@@ -4,8 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-
-	"github.com/asim9115/containerix/internal/container"
+    "github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/types"
 )
 

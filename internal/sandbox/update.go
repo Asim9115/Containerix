@@ -20,3 +20,10 @@ func (s *SandboxManager) AddContainer(container *types.Container) {
 	defer s.mu.Unlock()
 	s.Containers[container.ID] = container
 }
+
+func (s *SandboxManager) RemoveContainer(id string){
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.Sandbox.Containers, id)
+
+}
