@@ -44,45 +44,52 @@ func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (str
 
 	//check if docker file already exists
 	if detected.HasDockerfile {
+		log.Printf("Builder - Using existing Dockerfile, building image %s", tag)
 		buildCommand := exec.Command("docker", "build", "-t", tag, temporaryPath)
-		output, err := buildCommand.CombinedOutput()
-		if err != nil {
-			log.Printf("Builder Error - Docker build failed for %s: %v. Output: %s", tag, err, string(output))
-			return "", fmt.Errorf(
-				"error building docker image: %w\n%s",
-				err,
-				string(output),
-			)
+		buildCommand.Stdout = os.Stdout
+		buildCommand.Stderr = os.Stderr
+		if err := buildCommand.Run(); err != nil {
+			log.Printf("Builder Error - Docker build failed for %s: %v", tag, err)
+			return "", fmt.Errorf("error building docker image: %w", err)
 		}
 		fmt.Printf("Successfully built image %s\n", tag)
 		return tag, nil
 	}
 
-	var (
-		content string
-		err 	error
-	)
-	//Generate Dockerfile based on detected language
+	var content string
+
+	//Generate Dockerfile content based on detected language
 	switch detected.Language {
 	case detector.LangNode:
+		var err error
 		content, err = docker.GenerateNode(detected)
-		
+		if err != nil {
+			return "", fmt.Errorf("node dockerfile generation failed: %w", err)
+		}
 	case detector.LangPython:
+		var err error
 		content, err = docker.GeneratePython(detected)
+		if err != nil {
+			return "", fmt.Errorf("python dockerfile generation failed: %w", err)
+		}
 	case detector.LangGo:
+		var err error
 		content, err = docker.GenerateGo(detected)
+		if err != nil {
+			return "", fmt.Errorf("go dockerfile generation failed: %w", err)
+		}
 	default:
-		return "", fmt.Errorf("unsupported language: %s", detected.Language)
+		return "", fmt.Errorf("unsupported language: %q — could not detect language from repo", detected.Language)
 	}
-	//creating docker file
+
+	//write generated Dockerfile
 	dockerfilepath := filepath.Join(temporaryPath, "Dockerfile")
-	_, err = os.Create(dockerfilepath)
-	if err != nil {
-		log.Printf("Builder Error - Failed to create Dockerfile: %v", err)
+	if err := os.WriteFile(dockerfilepath, []byte(content), 0644); err != nil {
+		log.Printf("Builder Error - Failed to write Dockerfile: %v", err)
 		return "", err
 	}
 	fmt.Println("file created")
-	err = os.WriteFile(dockerfilepath, []byte(content), 0644)
+	err := os.WriteFile(dockerfilepath, []byte(content), 0644)
 	if err != nil {
 		log.Printf("Builder Error - Failed to write Dockerfile content: %v", err)
 		return "", err

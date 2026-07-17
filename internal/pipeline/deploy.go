@@ -49,7 +49,13 @@ func Deploy(jobId string, url string) (string, error) {
 
 	//4. Detect Language or DockerFile
 	result := detector.Detect(path)
-	log.Printf("Building Docker image")
+	log.Printf("Detected: language=%s framework=%s version=%s port=%d hasDockerfile=%v", result.Language, result.Framework, result.Version, result.Port, result.HasDockerfile)
+
+	// Use detected container port; fall back to 8080 if unknown (e.g. existing Dockerfile)
+	containerPort := result.Port
+	if containerPort == 0 {
+		containerPort = 8080
+	}
 
 	//5. Build Docker Image
 	tag, err := builder.BuildDockerImage(path, result)
@@ -73,12 +79,12 @@ func Deploy(jobId string, url string) (string, error) {
 		Image: tag,
 		Tier:  types.Tier1,
 		Ports: []types.PortMapping{
-			{HostPort: hostPort, ContainerPort: 5000},
+			{HostPort: hostPort, ContainerPort: containerPort},
 		},
 	}
 	log.Printf("config : %v", cfg)
 	//10. mark port as used
-	state.SB.Ports.Reserve(cfg.Name, hostPort, 5000)
+	state.SB.Ports.Reserve(cfg.Name, hostPort, containerPort)
 
 	//11. Update sandbox resources
 

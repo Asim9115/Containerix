@@ -2,68 +2,35 @@ package docker
 
 import (
 	"fmt"
+
 	"github.com/asim9115/containerix/internal/detector"
 )
 
-
-func GenerateNode(detected detector.DetectResult) (string, error) {
-	return "", nil
+// GenerateNode dispatches to the correct Node/JS template.
+func GenerateNode(d detector.DetectResult) (string, error) {
+	return generateNode(d)
 }
 
-
-func GenerateGo(detected detector.DetectResult) (string, error) {
-
-	version := detected.Version
-	if version == "" {
-		version = "1.26.2"
-	}
-
-	content := fmt.Sprintf(`FROM golang:%s AS builder
-
-WORKDIR /app
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-
-RUN CGO_ENABLED=0 GOOS=linux \
-    go build -ldflags="-s -w" \
-    -o app main.go
-
-# Runtime stage
-FROM gcr.io/distroless/static-debian12
-
-COPY --from=builder /app/app /app
-
-EXPOSE 8000
-
-ENTRYPOINT ["/app"]
-`, version)
-
-	return content, nil
-
+// GeneratePython dispatches to the correct Python template.
+func GeneratePython(d detector.DetectResult) (string, error) {
+	return generatePython(d)
 }
 
-func GeneratePython(detected detector.DetectResult) (string, error) {
-	version := detected.Version
+// GenerateGo dispatches to the correct Go template.
+func GenerateGo(d detector.DetectResult) (string, error) {
+	return generateGo(d)
+}
 
-	if version == "" {
-		version = "3.12"
+// Generate is a convenience function that dispatches on Language.
+func Generate(d detector.DetectResult) (string, error) {
+	switch d.Language {
+	case detector.LangNode:
+		return GenerateNode(d)
+	case detector.LangPython:
+		return GeneratePython(d)
+	case detector.LangGo:
+		return GenerateGo(d)
+	default:
+		return "", fmt.Errorf("unsupported language: %q", d.Language)
 	}
-
-	content := fmt.Sprintf(`FROM python:%s
-
-WORKDIR /app
-
-COPY requirements.txt .
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-CMD ["python", "main.py"]
-`, version)
-
-	return content, nil
 }
