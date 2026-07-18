@@ -1,6 +1,9 @@
 package pipeline
 
 import (
+	"log"
+	"os"
+
 	"github.com/asim9115/containerix/internal/builder"
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
@@ -8,8 +11,6 @@ import (
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
-	"log"
-	"os"
 )
 
 func Deploy(jobId string, url string) (string, error) {
@@ -45,20 +46,56 @@ func Deploy(jobId string, url string) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(path)
-	log.Print("Detecting Language")
 
-	//4. Detect Language or DockerFile
-	result := detector.Detect(path)
+	/*
+	// OLD STATIC DETECTION
+	containerPort, err := detector.GetInternalPort(path)
+	log.Printf("detected port : %d",containerPort)
+	if err != nil {
+		log.Printf("Pipeline Error - Failed to determine exposed port: %v", err)
+		// Handle fallback or error as needed
+		containerPort = 3000 
+	}
+	log.Printf("Detected Container Port: %d", containerPort)
+	*/
+
 	log.Printf("Building Docker image")
-
 	//5. Build Docker Image
-	tag, err := builder.BuildDockerImage(path, result)
+	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
 		log.Printf("Pipeline Error - Docker build failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
 
+	//6. Probe to detect active container port
+	probeName := tag + "-probe"
+	log.Printf("Running probe container %s to detect port", probeName)
+	
+	err = docker.RunContainerWithoutPorts(types.Config{
+		Image: tag,
+		Tier:  types.Tier1,
+	}, probeName)
+	
+	if err != nil {
+		// handle probe run failure
+		log.Printf("Pipeline Error - Probe run failed: %v", err)
+		state.SB.Sandbox.Release(cpu, memory)
+		return "", err
+	}
+	ip, _ := docker.GetContainerIp(probeName)
+	containerPort, err := detector.ScanActivePort(ip)
+
+	if err != nil {
+		log.Printf("Pipeline Error - Failed to determine exposed port dynamically: %v", err)
+		containerPort = 3000 // Fallback
+	}
+	log.Printf("Dynamically Detected Container Port: %d", containerPort)
+	
+	// Cleanup Probe Container
+	docker.StopContainer(probeName)
+	docker.DeleteContainer(probeName)
+	
 	//6. get free port
 	hostPort, err := state.SB.Ports.GetFreePort()
 	if err != nil {
@@ -73,12 +110,12 @@ func Deploy(jobId string, url string) (string, error) {
 		Image: tag,
 		Tier:  types.Tier1,
 		Ports: []types.PortMapping{
-			{HostPort: hostPort, ContainerPort: 5000},
+			{HostPort: hostPort, ContainerPort: containerPort},
 		},
 	}
 	log.Printf("config : %v", cfg)
 	//10. mark port as used
-	state.SB.Ports.Reserve(cfg.Name, hostPort, 5000)
+	state.SB.Ports.Reserve(cfg.Name, hostPort, containerPort)
 
 	//11. Update sandbox resources
 
