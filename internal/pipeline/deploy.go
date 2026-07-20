@@ -1,6 +1,10 @@
 package pipeline
 
 import (
+	"fmt"
+	"log"
+	"os"
+
 	"github.com/asim9115/containerix/internal/builder"
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
@@ -8,16 +12,20 @@ import (
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
-	"log"
-	"os"
 )
 
-func Deploy(jobId string, url string) (string, error) {
-
+func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
+	emit := func(msg string) {
+		// non-blocking send so a stalled client never freezes the pipeline
+		select {
+		case logBus.Ch <- types.SSEEvent{Event: "log", Data: msg}:
+		default: // drop if buffer full — pipeline keeps going
+		}
+	}
 	//temporary values
 	cpu := types.Tier1.Cpu
 	memory := "524288000"
-
+	emit("checking sandbox resources")
 	//1. Check sandbox resources
 	log.Print("checking sandbox resources")
 	err := state.SB.Sandbox.CanAllocate(cpu, memory)
@@ -26,7 +34,7 @@ func Deploy(jobId string, url string) (string, error) {
 		return "", err
 	}
 	state.SB.Sandbox.Allocate(cpu, memory)
-
+	emit("validating url : " + url)
 	log.Printf("validating url : %s", url)
 
 	//2. Validate url from url injection
@@ -36,7 +44,7 @@ func Deploy(jobId string, url string) (string, error) {
 		return "", err
 	}
 	log.Printf("Cloning Repo : %s", url)
-
+	emit("cloning repository...")
 	//3. Clone the repository
 	path, err := builder.CloneRepository(url)
 	if err != nil {
@@ -45,19 +53,47 @@ func Deploy(jobId string, url string) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(path)
-	log.Print("Detecting Language")
 
-	//4. Detect Language or DockerFile
-	result := detector.Detect(path)
+
 	log.Printf("Building Docker image")
+	emit("Building Docker image...")
 
+log.Printf("Building Docker image")
 	//5. Build Docker Image
-	tag, err := builder.BuildDockerImage(path, result)
+	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
 		log.Printf("Pipeline Error - Docker build failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
+
+	//6. Probe to detect active container port
+	probeName := tag + "-probe"
+	log.Printf("Running probe container %s to detect port", probeName)
+	
+	err = docker.RunContainerWithoutPorts(types.Config{
+		Image: tag,
+		Tier:  types.Tier1,
+	}, probeName)
+	
+	if err != nil {
+		// handle probe run failure
+		log.Printf("Pipeline Error - Probe run failed: %v", err)
+		state.SB.Sandbox.Release(cpu, memory)
+		return "", err
+	}
+	ip, _ := docker.GetContainerIp(probeName)
+	containerPort, err := detector.ScanActivePort(ip)
+
+	if err != nil {
+		log.Printf("Pipeline Error - Failed to determine exposed port dynamically: %v", err)
+		containerPort = 3000 // Fallback
+	}
+	log.Printf("Dynamically Detected Container Port: %d", containerPort)
+	
+	// Cleanup Probe Container
+	docker.StopContainer(probeName)
+	docker.DeleteContainer(probeName)
 
 	//6. get free port
 	hostPort, err := state.SB.Ports.GetFreePort()
@@ -73,7 +109,7 @@ func Deploy(jobId string, url string) (string, error) {
 		Image: tag,
 		Tier:  types.Tier1,
 		Ports: []types.PortMapping{
-			{HostPort: hostPort, ContainerPort: 5000},
+			{HostPort: hostPort, ContainerPort: containerPort},
 		},
 	}
 	log.Printf("config : %v", cfg)
@@ -121,6 +157,14 @@ func Deploy(jobId string, url string) (string, error) {
 		Status: "running",
 	})
 
+	appUrl := fmt.Sprintf("http://localhost:%d", hostPort)
+	emit_event := func(event, data string) {
+		select {
+		case logBus.Ch <- types.SSEEvent{Event: event, Data: data}:
+		default:
+		}
+	}
+	emit_event("deployed", appUrl)
 	//13. Return container id and host port
 	return cfg.Name, nil
 }

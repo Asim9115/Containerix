@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"net/url"
-	"github.com/asim9115/containerix/internal/detector"
-	"github.com/asim9115/containerix/internal/docker"
 	"github.com/google/uuid"
 )
 
@@ -38,71 +36,46 @@ func CloneRepository(repoUrl string) (string, error) {
 
 }
 
-func BuildDockerImage(temporaryPath string, detected detector.DetectResult) (string, error) {
+func BuildDockerImage(temporaryPath string) (string, error) {
 	id := uuid.New()
 	tag := "containerix-" + id.String()
+	
+	//if dockerfile exists then go with dockerfile
+	dockerFilePath := filepath.Join(temporaryPath, "Dockerfile")
+	DockerFilePath := filepath.Join(temporaryPath, "dockerfile")
+	var validDockerFilePath string
 
-	//check if docker file already exists
-	if detected.HasDockerfile {
-		buildCommand := exec.Command("docker", "build", "-t", tag, temporaryPath)
-		output, err := buildCommand.CombinedOutput()
-		if err != nil {
-			log.Printf("Builder Error - Docker build failed for %s: %v. Output: %s", tag, err, string(output))
-			return "", fmt.Errorf(
-				"error building docker image: %w\n%s",
-				err,
-				string(output),
-			)
+	if fileExists(dockerFilePath) {
+		validDockerFilePath = dockerFilePath
+	} else if fileExists(DockerFilePath) {
+		validDockerFilePath = DockerFilePath
+	}
+	log.Print("detecting dockefile")
+	if validDockerFilePath != "" {
+		log.Print("Dockerfile exists")
+		log.Printf("Builder : running docker build for path=%s tag=%s", temporaryPath, tag)
+		cmd := exec.Command("docker", "build", "-f", validDockerFilePath, "-t", tag, temporaryPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("Builder Error - docker build failed for %s: %v\n", tag, err)
+			return "", fmt.Errorf("docker build failed: %w\n", err)
 		}
-		fmt.Printf("Successfully built image %s\n", tag)
+
 		return tag, nil
 	}
 
-	var (
-		content string
-		err 	error
-	)
-	//Generate Dockerfile based on detected language
-	switch detected.Language {
-	case detector.LangNode:
-		content, err = docker.GenerateNode(detected)
-		
-	case detector.LangPython:
-		content, err = docker.GeneratePython(detected)
-	case detector.LangGo:
-		content, err = docker.GenerateGo(detected)
-	default:
-		return "", fmt.Errorf("unsupported language: %s", detected.Language)
+	log.Printf("Builder: running nixpacks build for path=%s tag=%s", temporaryPath, tag)
+
+	cmd := exec.Command("nixpacks", "build", temporaryPath, "--name", tag)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Printf("Builder Error - nixpacks build failed for %s: %v\n", tag, err)
+		return "", fmt.Errorf("nixpacks build failed: %w\n", err)
 	}
-	//creating docker file
-	dockerfilepath := filepath.Join(temporaryPath, "Dockerfile")
-	_, err = os.Create(dockerfilepath)
-	if err != nil {
-		log.Printf("Builder Error - Failed to create Dockerfile: %v", err)
-		return "", err
-	}
-	fmt.Println("file created")
-	err = os.WriteFile(dockerfilepath, []byte(content), 0644)
-	if err != nil {
-		log.Printf("Builder Error - Failed to write Dockerfile content: %v", err)
-		return "", err
-	}
-	fmt.Println("wrote dockerfile")
-	fmt.Println("building now")
-	//building docker file
-	buildCommand := exec.Command("docker", "build", "-t", tag, temporaryPath)
-	buildCommand.Stdout = os.Stdout
-	buildCommand.Stderr = os.Stderr
-	err = buildCommand.Run()
-	if err != nil {
-		log.Printf("Builder Error - Docker build failed for %s: %v", tag, err)
-		return "", fmt.Errorf(
-			"error building docker image: %w\n%s",
-			err,
-			string(tag),
-		)
-	}
-	fmt.Printf("Successfully built image %s\n", tag)
+
+	log.Printf("Builder: nixpacks build succeeded, image=%s", tag)
 	return tag, nil
 }
 
@@ -147,4 +120,9 @@ func ValidateRepoUrl(repoUrl string) error {
 
 	return nil
 
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

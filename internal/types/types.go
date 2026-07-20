@@ -104,3 +104,17 @@ var (
 		CapDrop:         []string{"ALL"},
 	}
 )
+
+// channel to stream logs
+type LogBus struct {
+	Ch chan SSEEvent
+}
+
+func NewLogBus() *LogBus {
+	return &LogBus{Ch: make(chan SSEEvent, 256)}
+}
+
+type SSEEvent struct {
+	Event string
+	Data  string
+}

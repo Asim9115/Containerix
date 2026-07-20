@@ -1,13 +1,18 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"github.com/asim9115/containerix/internal/types"
+	"time"
+	"context"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/state"
-    "github.com/gin-gonic/gin"
+	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/types"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type githubUrl struct{
@@ -24,12 +29,46 @@ func CreateDockerImage(c *gin.Context) {
         c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "url is required"})
         return
     }
-    output, err := pipeline.Deploy("first", body.Url)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to deploy"})
-        return
+	jobId := uuid.New().String()
+	logBus := types.NewLogBus()
+    job := &Job{
+        ID:        jobId,
+        Status:    StatusQueued,
+        CreatedAt: time.Now(),
+        LogBus:    logBus,
     }
-    c.JSON(http.StatusOK, gin.H{"success": true, "data": output})
+    Jobs.Set(jobId, job)
+
+	    go func() {
+    containerID, err := pipeline.Deploy(jobId, logBus, body.Url)
+    if err != nil {
+        Jobs.Update(jobId, func(j *Job) {
+            j.Status = StatusFailed
+            j.Error  = err.Error()
+        })
+    } else {
+        containerBus := types.NewLogBus()
+        Jobs.Update(jobId, func(j *Job) {
+            j.Status       = StatusRunning
+            j.ContainerID  = containerID
+            j.ContainerBus = containerBus
+        })
+        // Stream live container logs in background
+        go func() {
+            ctx := context.Background()
+            _ = docker.StreamContainerLogs(ctx, containerID, containerBus.Ch)
+            close(containerBus.Ch)
+        }()
+    }
+    close(logBus.Ch)
+    }()
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"job_id": jobId,
+		"status": "queued",
+		"logs":   "/containers/" + jobId + "/logs",
+	})
+
 }
 
 
@@ -122,3 +161,61 @@ func DeleteContainer(c *gin.Context) {
 		"message": "Deleted",
 	})
 }
+
+func StreamLogs(c *gin.Context) {
+    id := c.Param("id")
+    job, ok := Jobs.Get(id)
+    if !ok {
+        job, ok = Jobs.GetByContainerID(id)
+    }
+    if !ok {
+        c.JSON(404, gin.H{"error": "job or container not found"})
+        return
+    }
+    // SSE headers
+    c.Writer.Header().Set("Content-Type",      "text/event-stream")
+    c.Writer.Header().Set("Cache-Control",     "no-cache")
+    c.Writer.Header().Set("Connection",        "keep-alive")
+    c.Writer.Header().Set("X-Accel-Buffering", "no")
+    flusher, ok := c.Writer.(http.Flusher)
+    if !ok {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "streaming not supported"})
+        return
+    }
+    // ── Phase A: drain build-time log bus ────────────────────────────────────
+    for evt := range job.LogBus.Ch {
+        fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", evt.Event, evt.Data)
+        flusher.Flush()
+    }
+    // ── Phase B: if deploy failed, close stream ───────────────────────────────
+    // Re-read job state after build bus closed
+    job, _ = Jobs.Get(id)
+    if job.Status == StatusFailed {
+        fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", job.Error)
+        flusher.Flush()
+        return
+    }
+    // ── Phase C: stream live container logs ───────────────────────────────────
+    // ContainerBus may not be assigned yet (tiny race); wait briefly
+    var containerBus *types.LogBus
+    for i := 0; i < 20; i++ {
+        j, _ := Jobs.Get(id)
+        if j.ContainerBus != nil {
+            containerBus = j.ContainerBus
+            break
+        }
+        time.Sleep(100 * time.Millisecond)
+    }
+    if containerBus == nil {
+        fmt.Fprintf(c.Writer, "event: done\ndata: container logs unavailable\n\n")
+        flusher.Flush()
+        return
+    }
+    for evt := range containerBus.Ch {
+        fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", evt.Event, evt.Data)
+        flusher.Flush()
+    }
+    fmt.Fprintf(c.Writer, "event: done\ndata: container stopped\n\n")
+    flusher.Flush()
+}
+
