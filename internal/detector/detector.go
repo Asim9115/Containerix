@@ -1,193 +1,145 @@
 package detector
 
 import (
-	"fmt"
-	"log"
-	"net"
-
-	"time"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"regexp"
 )
 
-/*
-// OLD STATIC DETECTION LOGIC (Deprecated in favor of Probe & Restart)
-var DefaultPorts = map[string]int{
-	"django":      8000,
-	"flask":       5000,
-	"fastapi":     8000,
-	"express":     3000,
-	"nestjs":      3000,
-	"nexltjs":      3000,
-	"nuxt":        3000,
-	"react":       3000,
-	"vue":         5173,
-	"angular":     4200,
-	"vite":        5173,
-	"remix":       3000,
-	"spring-boot": 8080,
-	"laravel":     8000,
-	"rails":       3000,
-	"phoenix":     4000,
-	"aspnet":      5000,
-	"gin":         8080,
-	"fiber":       3000,
-	"echo":        1323,
-	"actix":       8080,
-	"rocket":      8000,
-}
+type Language string
 
 const (
-	LangNode   = "node"
-	LangPython = "python"
-	LangGo     = "go"
+	LangDockerfile Language = "dockerfile"
+	LangNode       Language = "node"
+	LangPython     Language = "python"
+	LangGo         Language = "go"
+	LangJava       Language = "java"
+	LangRust       Language = "rust"
+	LangRuby	   Language = "ruby"
+	LangUnknown    Language = "unknown"
 )
 
-type Result struct {
-	Language  string
+type DetectResult struct {
+	Language Language
+	HasDockerfile bool
+	DockerFilePath string
 	Framework string
-	Port      int
+	Version string
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+type PackageJSON struct {
+	Dependencies map[string]string `json:"dependencies"`
+	DevDependencies map[string]string `json:"devDependencies"`
+	Scripts map[string]string `json:"scripts"`
+	Engines map[string]string `json:"engines"`
+
 }
 
-func GetInternalPort(path string) (int, error) {
+//inspect root of the repo and return detected language
 
-	result := Result{}
+func Detect(repoPath string) DetectResult {
+	result := DetectResult{}
+
+	dockerfilepath := filepath.Join(repoPath, "Dockerfile")
+	if fileExists(dockerfilepath) {
+		result.HasDockerfile = true
+		result.DockerFilePath = dockerfilepath
+		result.Language = LangDockerfile
+		return result
+	}
+
 	indicators := []struct {
-		file     string
-		language string
-	}{
+		file string
+		language Language
+	} {
 		{"package.json", LangNode},
 		{"requirements.txt", LangPython},
 		{"pyproject.toml", LangPython},
 		{"setup.py", LangPython},
 		{"go.mod", LangGo},
+		{"Gemfile", LangRuby},
+		{"pom.xml", LangJava},
+		{"build.gradle", LangJava},
+		{"Cargo.toml", LangRust},
 	}
 	for _, ind := range indicators {
-		if fileExists(filepath.Join(path, ind.file)) {
+		if fileExists(filepath.Join(repoPath, ind.file)) {
 			result.Language = ind.language
 			break
 		}
 	}
 
-	detectFramework(&result, path)
-
-	framework := result.Framework
-	if port, ok := DefaultPorts[framework];ok {
-		return port, nil
-	} else {
-		return 8000, nil
+	if result.Language == "" {
+		result.Language = LangUnknown
+		return result
 	}
-}
-
-func detectFramework(result *Result, path string) {
 
 	if result.Language == LangNode {
-		detectNode()
-
-	} else if result.Language == LangPython {
-		framework := detectPython(path)
-		result.Framework = framework
-		return
-	} else if result.Language == LangGo {
-		result.Port = 8080
-		return
-	}
-}
-
-func detectPython(path string) string {
-	if fileExists(filepath.Join(path, "manage.py")) {
-		return "django"
-	}
-
-	files := []string {
-		"requirements.txt", "pyproject.toml", "Pipfile", "setup.py",
-	}
-
-	frameworks := []string{
-		"django",
-		"flask",
-		"fastapi",
-		"streamlit",
-		"dash",
-		"tornado",
-		"bottle",
-		"falcon",
-		"pyramid",
-		"sanic",
-		"quart",
-	}
-	for _, file := range files {
-		newpath := filepath.Join(path, file)
-		data, err := os.ReadFile(newpath)
-		if err != nil {
-			continue
-		}
-		content := strings.ToLower(string(data))
-
-		for _, framework := range frameworks {
-			if strings.Contains(content, framework){
-				return framework
-			}
-
+		pkg, err := readPackageJson(repoPath)
+		if err == nil {
+			result.Framework = detectFramework(pkg)
+			result.Version = detectNodeVersion(pkg)
+		} else {
+			result.Framework = "generic-node"
+			result.Version = "20"
 		}
 	}
-	return "python"
+	return result
 }
 
-func detectNode() {
-	
-}
-*/
-
-
-var CommonPorts = []int{
-	80,    // HTTP
-	3000,  // React, Express, Next.js
-	4000,  // Phoenix, GraphQL, various dev servers
-	4173,  // Vite preview
-	5000,  // Flask, ASP.NET, various apps
-	5173,  // Vite dev server
-	5500,  // Live Server (VS Code)
-	6006,  // Storybook
-	7000,  // Misc dev servers
-	8000,  // Django, FastAPI, Python HTTP server
-	8080,  // Spring Boot, Go, Java, Tomcat
-	8081,  // Alternate HTTP/dev server
-	8088,  // Misc web apps
-	8888,  // Jupyter Notebook
-	9000,  // PHP-FPM, SonarQube, dev servers
-	9090,  // Prometheus, Go apps
-	10000, // Render/default app port
-}
-
-func ScanActivePort(ip string) (int, error) {
-	if ip == "" {
-		return 0, fmt.Errorf("container IP is empty, cannot scan")
+func detectFramework(pkg *PackageJSON) string {
+	if _, ok := pkg.Dependencies["next"]; ok {
+		return "nextjs"
 	}
-	log.Printf("Starting port scan on IP: %s", ip)
-	
-	// 1. Give the app 2 seconds to boot up inside the container
-	time.Sleep(2 * time.Second)
-	
-	// 2. Retry up to 5 times for slower booting frameworks
-	for retries := 0; retries < 5; retries++ {
-		for _, port := range CommonPorts {
-			address := fmt.Sprintf("%s:%d", ip, port)
-			
-			// Attempt a TCP connection with a fast timeout
-			conn, err := net.DialTimeout("tcp", address, 1*time.Second)
-			if err == nil {
-				conn.Close()
-				log.Printf("Successfully connected to %s", address)
-				return port, nil // Found the active port!
-			}
-		}
-		log.Printf("Retry %d: No ports open yet on %s. Waiting...", retries+1, ip)
-		time.Sleep(2 * time.Second)
+	if _, ok := pkg.DevDependencies["vite"]; ok {
+		return "vite"
 	}
-	
-	return 0, fmt.Errorf("could not detect active port after probing")
+	if _, ok := pkg.Dependencies["react-scripts"]; ok {
+		return "cra"
+	}
+	if _, ok := pkg.Dependencies["express"]; ok {
+		return "express"
+	}
+	if _, ok := pkg.Dependencies["fastify"]; ok {
+		return "fastify"
+	}
+	return "generic-node"
+}
+
+func detectNodeVersion(pkg *PackageJSON) string {
+	raw, ok := pkg.Engines["node"]
+	if !ok || raw == "" {
+		return "20"
+	}
+
+	// strip symbols like >=, ^, ~, spaces — keep only the major version number
+	re := regexp.MustCompile(`\d+`)
+	match := re.FindString(raw)
+	if match == "" {
+		return "20"
+	}
+
+	return match
+}
+
+
+func readPackageJson(repoPath string) (*PackageJSON, error) {
+	path := filepath.Join(repoPath, "package.json")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var pkg PackageJSON
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return nil, err
+	}
+
+	return &pkg, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

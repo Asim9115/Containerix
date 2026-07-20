@@ -19,7 +19,6 @@ func RunContainer(cfg types.Config) error {
     "-d",
     "--name", cfg.Name,
     "-p", port,
-    "-e", fmt.Sprintf("PORT=%d", containerPort),
     "--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
     "--memory", cfg.Tier.Memory,
     "--memory-swap", cfg.Tier.Memory,
@@ -88,33 +87,4 @@ func DeleteImage(id string) error {
         return fmt.Errorf("docker rmi failed: %v: %s", err, out)
     }
     return nil
-}
-
-func RunContainerWithoutPorts(cfg types.Config, probeName string) error {
-		cmd := exec.Command(
-		"docker",
-		"run",
-		"-d",
-		"--name", probeName,
-		"--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
-		"--memory", cfg.Tier.Memory,
-		"--memory-swap", cfg.Tier.Memory,
-		"--pids-limit", strconv.Itoa(cfg.Tier.PidsLimit),
-		"--security-opt", "no-new-privileges",
-		"--read-only",
-		cfg.Image,
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to start probe container: %s (err: %w)", string(output), err)
-	}
-	return nil
-}
-
-func GetContainerIp(id string) (string, error) {
-	output, err := exec.Command("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", id).Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
 }
