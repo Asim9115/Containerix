@@ -15,12 +15,19 @@ import (
 	"time"
 )
 
-type githubUrl struct {
+type BuildRequest struct {
 	Url string `json:"url"`
+	Tier string `json:"tier"`
+	Env map[string]string `json:"env"`
+}
+
+var availableTiers = map[string]types.Tier{
+	"tier1":types.Tier1,
+	"tier2":types.Tier2,
 }
 
 func CreateDockerImage(c *gin.Context) {
-	var body githubUrl
+	var body BuildRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request body"})
 		return
@@ -29,6 +36,17 @@ func CreateDockerImage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "url is required"})
 		return
 	}
+
+	tierName := body.Tier
+	if tierName == "" {
+		tierName = "tier1"
+	}
+	tier, ok := availableTiers[tierName]
+    if !ok {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tier, use tier1 or tier2"})
+		return
+	}
+
 	jobId := uuid.New().String()[:8]
 	logBus := types.NewLogBus()
 	job := &Job{
@@ -43,7 +61,7 @@ func CreateDockerImage(c *gin.Context) {
 		Jobs.Update(jobId, func(j *Job) {
 			j.Status = StatusBuilding
 		})
-		containerID, err := pipeline.Deploy(jobId, logBus, body.Url)
+		containerID, err := pipeline.Deploy(jobId, logBus, body.Url, tier, body.Env)
 		if err != nil {
 			Jobs.Update(jobId, func(j *Job) {
 				j.Status = StatusFailed
@@ -228,7 +246,7 @@ func GetJob(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "job not found"})
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"job_id":       job.ID,
 		"status":       job.Status,
 		"container_id": job.ContainerID,

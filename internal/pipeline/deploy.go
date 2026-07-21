@@ -14,7 +14,7 @@ import (
 	"github.com/asim9115/containerix/internal/types"
 )
 
-func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
+func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env map[string]string) (string, error) {
 	emit := func(msg string) {
 		// non-blocking send so a stalled client never freezes the pipeline
 		select {
@@ -22,13 +22,16 @@ func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
 		default: // drop if buffer full — pipeline keeps going
 		}
 	}
-	//temporary values
-	cpu := types.Tier1.Cpu
-	memory := "524288000"
+	
+	cpu := tier.Cpu
+	memory, err := types.MemoryToBytes(tier.Memory)
+	if err != nil {
+		memory = "524288000"
+	}
 	emit("checking sandbox resources")
 	//1. Check sandbox resources
 	log.Print("checking sandbox resources")
-	err := state.SB.Sandbox.CanAllocate(cpu, memory)
+	err = state.SB.Sandbox.CanAllocate(cpu, memory)
 	if err != nil {
 		log.Printf("Pipeline Error - Sandbox allocation failed: %v", err)
 		return "", err
@@ -72,7 +75,7 @@ func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
 
 	err = docker.RunContainerWithoutPorts(types.Config{
 		Image: tag,
-		Tier:  types.Tier1,
+		Tier:  tier,
 	}, probeName)
 
 	if err != nil {
@@ -106,7 +109,8 @@ func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
 	cfg := types.Config{
 		Name:  tag,
 		Image: tag,
-		Tier:  types.Tier1,
+		Tier:  tier,
+		Env: env,
 		Ports: []types.PortMapping{
 			{HostPort: hostPort, ContainerPort: containerPort},
 		},

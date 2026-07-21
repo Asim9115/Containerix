@@ -12,31 +12,36 @@ import (
 	"io"
 )
 func RunContainer(cfg types.Config) error {
-	hostPort := cfg.Ports[0].HostPort
-	containerPort := cfg.Ports[0].ContainerPort
-	port := fmt.Sprintf("%d:%d", hostPort, containerPort)
+	if len(cfg.Ports) == 0{
+		return fmt.Errorf("RunContainer: cfg.Ports is empty")
+	}
+	port := fmt.Sprintf("%d:%d", cfg.Ports[0].HostPort, cfg.Ports[0].ContainerPort)
 
-	cmd := exec.Command(
-    "docker",
-    "run",
-    "-d",
-    "--name", cfg.Name,
-    "-p", port,
-    "--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
-    "--memory", cfg.Tier.Memory,
-    "--memory-swap", cfg.Tier.Memory,
-    "--pids-limit", strconv.Itoa(cfg.Tier.PidsLimit),
-    "--security-opt", "no-new-privileges",
-    "--read-only",
-    cfg.Image,
-)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to start container: %s (err: %w)", string(output), err)
+	args := []string{
+		"run", "-d",
+        "--name", cfg.Name,
+        "-p", port,
+        "--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
+        "--memory", cfg.Tier.Memory,
+        "--memory-swap", cfg.Tier.Memory,
+        "--pids-limit", strconv.Itoa(cfg.Tier.PidsLimit),
+        "--security-opt", "no-new-privileges",
 	}
 
-	log.Printf("Container started successfully! ID: %s", string(output))
-	return nil
+	for key, value := range cfg.Env {
+		args = append(args, "-e", fmt.Sprintf("%s=%s", key, value) )
+	}
+
+   args = append(args, cfg.Image)
+   
+    cmd := exec.Command("docker", args...)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        return fmt.Errorf("failed to start container: %s (err: %w)", string(output), err)
+    }
+    log.Printf("Container started successfully! ID: %s", strings.TrimSpace(string(output)))
+    return nil
+
 }
 
 func StopContainer(id string) error {
