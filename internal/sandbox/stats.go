@@ -12,8 +12,8 @@ func (s *SandboxManager) Stats() types.Stats {
 	}
 }
 
-func (s *SandboxManager) GetState() *types.Sandbox {
+func (s *SandboxManager) GetState() types.Sandbox {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.Sandbox
+	return *s.Sandbox
 }

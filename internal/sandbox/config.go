@@ -15,7 +15,7 @@ type Sandbox interface {
 	Destroy() error
 	Stats() types.Stats
 	Remaining() types.Stats
-	GetState() *types.Sandbox
+	GetState() types.Sandbox
 	AddContainer(container *types.Container)
 	RemoveContainer(id string)
 }

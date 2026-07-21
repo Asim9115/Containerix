@@ -16,7 +16,6 @@ func Destroy(name string, rootpath string, containers map[string]*types.Containe
 	log.Printf("[cgroup.Destroy] Stopping all containers in sandbox %q", name)
 	container.StopAll(containers)
 	log.Printf("[cgroup.Destroy] All containers stopped, removing cgroup directory")
-
 	path := filepath.Join(rootpath, name)
 	log.Printf("[cgroup.Destroy] Removing cgroup path: %s", path)
 

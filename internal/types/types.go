@@ -94,7 +94,7 @@ var (
 		CapDrop:         []string{"ALL"},
 	}
 	Tier2 = Tier{
-		Name:            "Tier1",
+		Name:            "Tier2",
 		Cpu:             0.5,
 		Memory:          "750M",
 		PidsLimit:       150,

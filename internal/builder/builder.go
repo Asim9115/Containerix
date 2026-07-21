@@ -38,7 +38,7 @@ func CloneRepository(repoUrl string) (string, error) {
 
 func BuildDockerImage(temporaryPath string) (string, error) {
 	id := uuid.New()
-	tag := "containerix-" + id.String()
+	tag := "ctx-" + id.String()[:8]
 	
 	//if dockerfile exists then go with dockerfile
 	dockerFilePath := filepath.Join(temporaryPath, "Dockerfile")

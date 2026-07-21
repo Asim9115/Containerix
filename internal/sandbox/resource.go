@@ -38,6 +38,8 @@ func (s *SandboxManager)CanAllocate(cpuNeeded float64, memory string) error {
 }
 
 func (s *SandboxManager) Release(cpu float64, memory string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	newCpu := s.UsedCpu - cpu
 	freeMemory, err := strconv.Atoi(memory)
 	if err != nil {
@@ -48,15 +50,14 @@ func (s *SandboxManager) Release(cpu float64, memory string) error {
 		return err
 	}
 	newMemory := usedMemory - freeMemory
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.UsedCpu = newCpu
 	s.UsedMemory = strconv.Itoa(newMemory)
 	return nil
 }
 
 func (s *SandboxManager) Allocate(cpu float64, memory string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	newCpu := s.UsedCpu + cpu
 	addMemory, err := strconv.Atoi(memory)
 	if err != nil {
@@ -67,9 +68,6 @@ func (s *SandboxManager) Allocate(cpu float64, memory string) error {
 		return err
 	}
 	newMemory := usedMemory + addMemory
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.UsedCpu = newCpu
 	s.UsedMemory = strconv.Itoa(newMemory)
 	return nil

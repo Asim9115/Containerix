@@ -54,11 +54,10 @@ func Deploy(jobId string, logBus *types.LogBus, url string) (string, error) {
 	}
 	defer os.RemoveAll(path)
 
-
 	log.Printf("Building Docker image")
 	emit("Building Docker image...")
 
-log.Printf("Building Docker image")
+	log.Printf("Building Docker image")
 	//5. Build Docker Image
 	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
@@ -70,12 +69,12 @@ log.Printf("Building Docker image")
 	//6. Probe to detect active container port
 	probeName := tag + "-probe"
 	log.Printf("Running probe container %s to detect port", probeName)
-	
+
 	err = docker.RunContainerWithoutPorts(types.Config{
 		Image: tag,
 		Tier:  types.Tier1,
 	}, probeName)
-	
+
 	if err != nil {
 		// handle probe run failure
 		log.Printf("Pipeline Error - Probe run failed: %v", err)
@@ -90,7 +89,7 @@ log.Printf("Building Docker image")
 		containerPort = 3000 // Fallback
 	}
 	log.Printf("Dynamically Detected Container Port: %d", containerPort)
-	
+
 	// Cleanup Probe Container
 	docker.StopContainer(probeName)
 	docker.DeleteContainer(probeName)
@@ -114,7 +113,7 @@ log.Printf("Building Docker image")
 	}
 	log.Printf("config : %v", cfg)
 	//10. mark port as used
-	state.SB.Ports.Reserve(cfg.Name, hostPort, 5000)
+	state.SB.Ports.Reserve(cfg.Name, hostPort, containerPort)
 
 	//11. Update sandbox resources
 
