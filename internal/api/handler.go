@@ -256,3 +256,9 @@ func GetJob(c *gin.Context) {
 		"logs":         "/containers/" + job.ID + "/logs",
 	})
 }
+
+func GetAllJobs(c *gin.Context) {
+	jobs := Jobs.GetAll()
+
+	c.JSON(http.StatusOK, jobs)
+}

@@ -67,3 +67,16 @@ func (js *JobStore) GetByContainerID(id string) (*Job, bool) {
 	}
 	return nil, false
 }
+
+func (js *JobStore) GetAll()([]Job) {
+	js.mu.Lock()
+	defer js.mu.Unlock()
+
+	//create slice to hold jobs
+	result := make([]Job, 0, len(js.jobs))
+
+	for _, job := range js.jobs {
+		result = append(result, *job)
+	} 
+	return result
+}

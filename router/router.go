@@ -17,6 +17,7 @@ func NewRouter() *gin.Engine {
 	r.DELETE("/containers/:id", api.DeleteContainer)
 	r.GET("/containers/:id/logs", api.StreamLogs)
 
-	r.GET("/job/:id", api.GetJob)
+	r.GET("/jobs/:id", api.GetJob)
+	r.GET("/jobs", api.GetAllJobs)
 	return r
 }

@@ -15,21 +15,24 @@ import (
 )
 
 func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env map[string]string) (string, error) {
+
 	emit := func(msg string) {
 		// non-blocking send so a stalled client never freezes the pipeline
 		select {
 		case logBus.Ch <- types.SSEEvent{Event: "log", Data: msg}:
-		default: // drop if buffer full — pipeline keeps going
+		default: 
+			<-logBus.Ch
+			logBus.Ch <- types.SSEEvent{Event: "log", Data: msg}
 		}
 	}
-	
+
 	cpu := tier.Cpu
 	memory, err := types.MemoryToBytes(tier.Memory)
 	if err != nil {
 		memory = "524288000"
 	}
 	emit("checking sandbox resources")
-	//1. Check sandbox resources
+	//--------------1. Check sandbox resources------------------
 	log.Print("checking sandbox resources")
 	err = state.SB.Sandbox.CanAllocate(cpu, memory)
 	if err != nil {
@@ -40,15 +43,16 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 	emit("validating url : " + url)
 	log.Printf("validating url : %s", url)
 
-	//2. Validate url from url injection
+	//----------------2. Validate url from url injection-------------
 	if err := builder.ValidateRepoUrl(url); err != nil {
 		log.Printf("Pipeline Error - Invalid URL %s: %v", url, err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
+
+	//----------------3. Clone the repository-------------------
 	log.Printf("Cloning Repo : %s", url)
 	emit("cloning repository...")
-	//3. Clone the repository
 	path, err := builder.CloneRepository(url)
 	if err != nil {
 		log.Printf("Pipeline Error - Repository clone failed for %s: %v", url, err)
@@ -57,11 +61,9 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 	}
 	defer os.RemoveAll(path)
 
+	//---------------4. Build Docker Image---------------------
 	log.Printf("Building Docker image")
 	emit("Building Docker image...")
-
-	log.Printf("Building Docker image")
-	//5. Build Docker Image
 	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
 		log.Printf("Pipeline Error - Docker build failed: %v", err)
@@ -69,35 +71,33 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 		return "", err
 	}
 
-	//6. Probe to detect active container port
+	//---------------5. Probe to detect active container port--------------
 	probeName := tag + "-probe"
 	log.Printf("Running probe container %s to detect port", probeName)
-
 	err = docker.RunContainerWithoutPorts(types.Config{
 		Image: tag,
 		Tier:  tier,
 	}, probeName)
-
 	if err != nil {
 		// handle probe run failure
 		log.Printf("Pipeline Error - Probe run failed: %v", err)
 		state.SB.Sandbox.Release(cpu, memory)
 		return "", err
 	}
+
+	//----------------6. Get container port---------------
 	ip, _ := docker.GetContainerIp(probeName)
 	containerPort, err := detector.ScanActivePort(ip)
-
 	if err != nil {
 		log.Printf("Pipeline Error - Failed to determine exposed port dynamically: %v", err)
 		containerPort = 3000 // Fallback
 	}
 	log.Printf("Dynamically Detected Container Port: %d", containerPort)
-
 	// Cleanup Probe Container
 	docker.StopContainer(probeName)
 	docker.DeleteContainer(probeName)
 
-	//6. get free port
+	//-----------------7. Check internal free port ----------------------
 	hostPort, err := state.SB.Ports.GetFreePort()
 	if err != nil {
 		log.Printf("Pipeline Error - Port allocation failed: %v", err)
@@ -106,24 +106,23 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 	}
 	log.Printf("Free Port : %d", hostPort)
 
+	//-----------------8. Prepare container config----------------------
 	cfg := types.Config{
 		Name:  tag,
 		Image: tag,
 		Tier:  tier,
-		Env: env,
+		Env:   env,
 		Ports: []types.PortMapping{
 			{HostPort: hostPort, ContainerPort: containerPort},
 		},
 	}
 	log.Printf("config : %v", cfg)
-	//10. mark port as used
+
+	//---------------9. Reserve the port------------------
 	state.SB.Ports.Reserve(cfg.Name, hostPort, containerPort)
 
-	//11. Update sandbox resources
-
+	//------------10. Start the contauner-------------
 	log.Println("Starting Container")
-
-	// 7. Run the container
 	cfg, err = container.Run(cfg)
 	if err != nil {
 		log.Printf("Pipeline Error - Container run failed: %v", err)
@@ -132,7 +131,7 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 		return "", err
 	}
 
-	// 8. Get PID of the running container by its name (not image tag)
+	//--------------11. Get pid of the container to add in cgroup------------
 	pid, err := docker.GetPid(cfg.Name)
 	if err != nil {
 		_ = docker.StopContainer(cfg.Name)
@@ -142,8 +141,9 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 		return "", err
 	}
 	log.Printf("container pid: %d", pid)
+	docker.DeleteImage(cfg.Name)
 
-	// 9. Add container process to sandbox cgroup
+	//------------12. Add pid to cgroup procs-------------------
 	if err := cgroup.AddProcess(state.SB.Sandbox.GetState().Name, pid); err != nil {
 		_ = docker.StopContainer(cfg.Name)
 		state.SB.Sandbox.Release(cfg.Tier.Cpu, cfg.Tier.Memory)
@@ -153,13 +153,14 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 	}
 	log.Printf("process %d added to cgroup", pid)
 
-	//12. store container in sandbox state cleanly
+	//--------------13. Add container to sandbox------------
 	state.SB.Sandbox.AddContainer(&types.Container{
 		ID:     cfg.Name,
 		Config: cfg,
 		Status: "running",
 	})
 
+	//-------------14. Container Url-------------------
 	appUrl := fmt.Sprintf("http://localhost:%d", hostPort)
 	emit_event := func(event, data string) {
 		select {
@@ -168,6 +169,7 @@ func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env
 		}
 	}
 	emit_event("deployed", appUrl)
-	//13. Return container id and host port
+
+	//------15. Return container id----------
 	return cfg.Name, nil
 }
