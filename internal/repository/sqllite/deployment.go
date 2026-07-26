@@ -3,7 +3,6 @@ package sqllite
 import (
 	"database/sql"
 	"time"
-
 	"github.com/asim9115/containerix/internal/repository"
 )
 
@@ -231,4 +230,32 @@ func (r *DeploymentRepo) GetAll() ([]repository.Deployment, error) {
 		return nil, err
 	}
 	return deployments, nil
+}
+
+func (r *DeploymentRepo) GetByContainerId(containerID string) (*repository.Deployment, error) {
+	var d = &repository.Deployment{}
+
+	err := r.db.QueryRow(`SELECT id, user_id, repo_url, status, 
+		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
+		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
+		        tier_name, COALESCE(error, ''), created_at, updated_at
+         FROM deployments WHERE container_id = ?`, containerID,
+	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
+		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
+		&d.Error, &d.CreatedAt, &d.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
+}
+
+func (r *DeploymentRepo)UpdateStatusByContainerID(containerID string, status string) error {
+	_, err := r.db.Exec(`
+	UPDATE deployments SET status=? WHERE container_id=?
+	`, status, containerID)
+	return err
 }

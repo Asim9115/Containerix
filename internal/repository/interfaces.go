@@ -1,6 +1,8 @@
 package repository
 
-import "time"
+import (
+	"time"
+)
 
 type Deployment struct {
     ID            string
@@ -40,6 +42,8 @@ type DeploymentRepo interface {
     Delete(id string) error
     ListByStatus(status string) ([]Deployment, error)
     GetAll() ([]Deployment, error)
+    GetByContainerId(containerID string) (*Deployment, error)
+    UpdateStatusByContainerID(containerID string, status string) error
 }
 
 // JobRepo — swap the implementation to switch databases

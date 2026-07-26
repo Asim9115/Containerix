@@ -8,8 +8,10 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"os"
 
 	"github.com/asim9115/containerix/internal/types"
 )
@@ -213,4 +215,71 @@ func StreamContainerLogs(ctx context.Context, containerName string, outCh chan<-
     }
     pw.Close()
     return cmd.Wait()
+}
+
+
+// func GetAll() ([]string, error) {
+// 	pids, err := cgroup.GetProcesses()
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	containerIDs := []string{}
+	
+// 	for _, pid := range pids {
+// 		containerID, err := GetContainerFromPID(pid)
+// 		if err != nil {
+// 			log.Printf("failed to get container for pid %s:%v", pid, err)
+// 			continue
+// 		}
+// 		if containerID == "" {
+// 			continue
+// 		}
+// 		containerIDs = append(containerIDs, containerID)
+// 	}
+// 	return containerIDs, nil
+// }
+
+func GetContainerFromPID(pid string) (string, error) {
+	cgroupPath := filepath.Join("/proc", pid, "cgroup")
+
+	file, err := os.Open(cgroupPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open %s: %w", cgroupPath, err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Docker container ID is usually a 64-character hex string.
+		parts := strings.Split(line, "/")
+
+		for i := len(parts) - 1; i >= 0; i-- {
+			value := strings.TrimSpace(parts[i])
+
+			if len(value) == 64 && isHex(value) {
+				return value, nil
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed reading %s: %w", cgroupPath, err)
+	}
+
+	return "", nil
+}
+
+func isHex(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') ||
+			(c >= 'a' && c <= 'f') ||
+			(c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+
+	return true
 }
