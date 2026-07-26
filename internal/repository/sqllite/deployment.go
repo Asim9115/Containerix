@@ -27,16 +27,21 @@ func (r *DeploymentRepo) Create(d *repository.Deployment) error {
 func (r *DeploymentRepo) GetByID(id string) (*repository.Deployment, error) {
 	d := &repository.Deployment{}
 	err := r.db.QueryRow(
-		`SELECT id, user_id, repo_url, status, container_id, image_tag,
-                host_port, container_port, tier_name, error, created_at
+		`SELECT id, user_id, repo_url, status, 
+		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
+		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
+		        tier_name, COALESCE(error, ''), created_at, updated_at
          FROM deployments WHERE id = ?`, id,
 	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
 		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
-		&d.Error, &d.CreatedAt)
+		&d.Error, &d.CreatedAt, &d.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return d, err
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 func (r *DeploymentRepo) UpdateStatus(id, status, ContainerID string, hostPort int) error {
@@ -53,15 +58,15 @@ func (r *DeploymentRepo) ListByUser(userID string) ([]repository.Deployment, err
 	rows, err := r.db.Query(`
 		SELECT
 			id, user_id, repo_url, status,
-			container_id,
-			image_tag,
-			host_port,
-			container_port,
+			COALESCE(container_id, ''),
+			COALESCE(image_tag, ''),
+			COALESCE(host_port, 0),
+			COALESCE(container_port, 0),
 			tier_name,
-			tier_cpu,
-			tier_memory,
-			env_json,
-			error,
+			COALESCE(tier_cpu, 0.0),
+			COALESCE(tier_memory, ''),
+			COALESCE(env_json, '{}'),
+			COALESCE(error, ''),
 			created_at,
 			updated_at
 		FROM deployments
@@ -113,7 +118,7 @@ func (r *DeploymentRepo) UpdateError(id, status, errMsg string) error {
 		SET error=?, status=?, updated_at=?
 		WHERE id=?
 	`, errMsg, status, time.Now(), id)
-	
+
 	return err
 }
 
@@ -128,15 +133,15 @@ func (r *DeploymentRepo) Delete(id string) error {
 func (r *DeploymentRepo) ListByStatus(status string) ([]repository.Deployment, error) {
 	deployments := make([]repository.Deployment, 0)
 	rows, err := r.db.Query(`SELECT id, user_id, repo_url, status,
-			container_id,
-			image_tag,
-			host_port,
-			container_port,
+			COALESCE(container_id, ''),
+			COALESCE(image_tag, ''),
+			COALESCE(host_port, 0),
+			COALESCE(container_port, 0),
 			tier_name,
-			tier_cpu,
-			tier_memory,
-			env_json,
-			error,
+			COALESCE(tier_cpu, 0.0),
+			COALESCE(tier_memory, ''),
+			COALESCE(env_json, '{}'),
+			COALESCE(error, ''),
 			created_at,
 			updated_at FROM deployments
 			WHERE status=?`, status)
@@ -176,21 +181,21 @@ func (r *DeploymentRepo) ListByStatus(status string) ([]repository.Deployment, e
 	}
 	return deployments, nil
 }
-func (r *DeploymentRepo)GetAll() ([]repository.Deployment, error) {
+func (r *DeploymentRepo) GetAll() ([]repository.Deployment, error) {
 	deployments := make([]repository.Deployment, 0)
 	rows, err := r.db.Query(`SELECT id, user_id, repo_url, status,
-			container_id,
-			image_tag,
-			host_port,
-			container_port,
+			COALESCE(container_id, ''),
+			COALESCE(image_tag, ''),
+			COALESCE(host_port, 0),
+			COALESCE(container_port, 0),
 			tier_name,
-			tier_cpu,
-			tier_memory,
-			env_json,
-			error,
+			COALESCE(tier_cpu, 0.0),
+			COALESCE(tier_memory, ''),
+			COALESCE(env_json, '{}'),
+			COALESCE(error, ''),
 			created_at,
 			updated_at FROM deployments
-			`,)
+			`)
 	if err != nil {
 		return nil, err
 	}

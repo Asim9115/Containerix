@@ -51,3 +51,8 @@ type JobRepo interface {
     SetCompleted(id, containerID string, hostPort int) error
     GetAll() ([]Job, error)
 }
+
+type Repos struct {
+    Deployments DeploymentRepo
+    Jobs JobRepo
+}
