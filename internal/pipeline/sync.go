@@ -8,54 +8,63 @@ import (
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/repository"
 )
-
-
-
+//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host 
 func SyncData(repos *repository.Repos) {
-	//sync all data that is in procs and database, update the status respectively
 
-	//get the process that are in cgroup.procs
+	//1. Get the process that are in currently in cgroup.procs
 	pids, err := cgroup.GetProcesses()
 	if err != nil {
-		log.Printf("processes not found : %v", err)
+		log.Printf("[sync] processes not found : %v", err)
 		return
 	}
 
-	//Get all containers ids from process id
-	var containerIDs []string
+	// 2. Map container IDs currently active on the host
+	hostContainersIDMap := make(map[string]bool)
 	for _, pid := range pids {
 		containerId, err := docker.GetContainerFromPID(pid)
 		if err != nil {
-			log.Printf("failed to get containerId of %v", pid)
+			log.Printf("[sync] failed to get containerId of %v", pid)
 			continue
 		}
-		containerIDs = append(containerIDs, containerId)
+		if containerId != "" {
+			hostContainersIDMap[containerId] = true
+		}
 	}
 
-	//Get all containers that are in database
+	//3. Get all containers that are in marked as running in database
 	dbContainers, err := repos.Deployments.ListByStatus("running")
 	if err != nil {
-		log.Printf("error geeting containers from database : %v",err)
+		log.Printf("[sync] error geeting containers from database : %v", err)
 		return
 	}
-	var dbContainersID []string
-	for _, container := range dbContainers {
-		dbContainersID = append(dbContainersID, container.ContainerID)
+
+	//4. map database containers ID
+	dbContainersMap := make(map[string]bool)
+	for _, dbContainer := range dbContainers {
+		if dbContainer.ID != "" {
+			dbContainersMap[dbContainer.ID] = true
+		}
 	}
-
-
-//Create a map and check the containers in both
-
-	for _, pcontainer := range containerIDs{
-		var found = false
-		for _, dbcontainer := range dbContainersID {
-			if pcontainer == dbcontainer {
-				found = true
-				break
+	//5. reconcile host -> database
+	//if its runniong but not in db then stop the container
+	for hostContainer := range hostContainersIDMap {
+		if !dbContainersMap[hostContainer] {
+			log.Printf("[Sync] Stopping orphaned host container: %s", hostContainer)
+			if err := container.Stop(hostContainer); err != nil {
+				log.Printf("[Sync] Failed to stop container %s: %v", hostContainer, err)
 			}
 		}
-		if !found {
-			container.Stop(pcontainer)
+	}
+
+	//6. reconcile database -> host
+	//if its marked running in db but not in host container then make the status stopped
+	for dbContainer := range dbContainersMap {
+		if !hostContainersIDMap[dbContainer] {
+			log.Printf("[Sync] Updating out-of-sync DB container to stopped: %s", dbContainer)
+			if err := repos.Deployments.UpdateStatusByContainerID(dbContainer, "stopped"); err != nil {
+				log.Printf("[Sync] Failed to update deployment status for %s: %v", dbContainer, err)
+			}
 		}
 	}
+
 }
