@@ -54,7 +54,7 @@ func Close() error {
 }
 
 func runMigrations() error {
-    schema := `...` // embed 001_init.sql content here or use embed
+    schema := `001_init.sql`
     _, err := db.Exec(schema)
     return err
 }

@@ -1,0 +1,27 @@
+package api
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func (h *GlobalState) GetContainer(c *gin.Context) {
+	containerID := c.Param("id")
+	container, err := h.Repos.Deployments.GetByContainerId(containerID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusFound, container)
+}
+
+func (h *GlobalState) DeleteContainer(c *gin.Context) {
+	containerID := c.Param("id")
+	err := h.Pipeline.DeleteContainer(containerID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusNoContent, gin.H{"message": "container deleted successfully"})
+}

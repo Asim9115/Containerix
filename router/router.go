@@ -2,22 +2,25 @@ package router
 
 import (
 	"github.com/asim9115/containerix/internal/api"
+	"github.com/asim9115/containerix/internal/pipeline"
+	"github.com/asim9115/containerix/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter() *gin.Engine {
+func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
 	r := gin.Default()
+	h := &api.GlobalState{Repos: repos, Pipeline: p}
 
-	r.POST("/build", api.CreateDockerImage)
-	r.GET("/cgroup", api.GetCgroup)
-	r.DELETE("/cgroup", api.DeleteCgroup)
+	r.POST("/build", h.CreateDockerImage)
+	r.GET("/cgroup", h.GetCgroup)
+	r.DELETE("/cgroup", h.DeleteCgroup)
 
-	r.GET("/containers", api.GetContainers)
-	r.GET("/containers/stopall", api.StopContainers)
-	r.DELETE("/containers/:id", api.DeleteContainer)
-	r.GET("/containers/:id/logs", api.StreamLogs)
+	r.GET("/containers", h.GetContainers)
+	r.GET("/containers/stopall", h.StopContainers)
+	r.DELETE("/containers/:id", h.DeleteContainer)
+	r.GET("/containers/:id/logs", h.StreamLogs)
 
-	r.GET("/jobs/:id", api.GetJob)
-	r.GET("/jobs", api.GetAllJobs)
+	r.GET("/jobs/:id", h.GetJob)
+	r.GET("/jobs", h.GetAllJobs)
 	return r
 }

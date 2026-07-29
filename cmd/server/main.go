@@ -3,24 +3,38 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 
+	"github.com/asim9115/containerix/internal/database"
+	"github.com/asim9115/containerix/internal/pipeline"
+	"github.com/asim9115/containerix/internal/repository"
+	"github.com/asim9115/containerix/internal/repository/sqllite"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/router"
 )
 
 func main() {
-	// Initialize global state: sandbox cgroup + port manager
-	if err := state.Init("containerix", 2, "3221225472"); err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Sandbox and port manager ready")
+    // 1. Init database
+    if err := database.Init("data/containerix.db"); err != nil {
+        log.Fatal(err)
+   }
+    defer database.Close()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+    // 2. Create repositories
+    db := database.GetDB()
+    repos := &repository.Repos{
+       Deployments: sqllite.NewDeploymentRepo(db),
+       Jobs:        sqllite.NewJobRepo(db),
+       Ports:       sqllite.NewPortsRepo(db),
+   }
 
-	log.Println("starting containerix on port", port)
-	log.Fatal(http.ListenAndServe(":"+port, router.NewRouter()))
+     // 3. Init sandbox (cgroup — stays in-memory, this is OS state)
+     if err := state.Init("containerix", 2, "3221225472"); err != nil {
+         log.Fatal(err)
+     }
+
+     // 4. Create pipeline (gets DB access via repos)
+     p := pipeline.New(repos)
+
+    log.Fatal(http.ListenAndServe(":8080", router.NewRouter(repos, p)))
+
 }

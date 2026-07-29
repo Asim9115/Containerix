@@ -32,6 +32,13 @@ type Job struct {
     CompletedAt  *time.Time
 }
 
+type Ports struct {
+    HostPort int
+    ContainerID string
+    ContainerPort int
+    AllocatedAt time.Time
+}
+
 // DeploymentRepo — swap the implementation to switch databases
 type DeploymentRepo interface {
     Create(d *Deployment) error
@@ -56,7 +63,16 @@ type JobRepo interface {
     GetAll() ([]Job, error)
 }
 
+//PortsRepo
+type PortsRepo interface {
+    Create(p *Ports) error
+    FreePort(HostPort int) error
+    DeleteByContainerID(ContainerID string) error
+    GetAll() ([]Ports, error)
+}
+
 type Repos struct {
     Deployments DeploymentRepo
     Jobs JobRepo
+    Ports PortsRepo
 }

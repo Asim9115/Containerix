@@ -2,7 +2,6 @@ package state
 
 import (
 	"fmt"
-
 	"github.com/asim9115/containerix/internal/ports"
 	"github.com/asim9115/containerix/internal/sandbox"
 )

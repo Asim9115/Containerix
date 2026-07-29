@@ -6,10 +6,10 @@ import (
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
-	"github.com/asim9115/containerix/internal/repository"
 )
-//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host 
-func SyncData(repos *repository.Repos) {
+//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host
+func (h *State) SyncData() {
+	repos := h.Repo
 
 	//1. Get the process that are in currently in cgroup.procs
 	pids, err := cgroup.GetProcesses()

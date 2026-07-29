@@ -14,7 +14,7 @@ import (
 	"github.com/asim9115/containerix/internal/types"
 )
 
-func Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env map[string]string) (string, error) {
+func (h *State) Deploy(jobId string, logBus *types.LogBus, url string, tier types.Tier, env map[string]string) (string, error) {
 
 	emit := func(msg string) {
 		// non-blocking send so a stalled client never freezes the pipeline
