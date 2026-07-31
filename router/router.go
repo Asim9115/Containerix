@@ -19,6 +19,7 @@ func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
 	r.GET("/containers/stopall", h.StopContainers)
 	r.DELETE("/containers/:id", h.DeleteContainer)
 	r.GET("/containers/:id/logs", h.StreamLogs)
+	r.GET("/containers/:id", h.GetContainer)
 
 	r.GET("/jobs/:id", h.GetJob)
 	r.GET("/jobs", h.GetAllJobs)

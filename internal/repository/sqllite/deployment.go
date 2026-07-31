@@ -43,10 +43,10 @@ func (r *DeploymentRepo) GetByID(id string) (*repository.Deployment, error) {
 	return d, nil
 }
 
-func (r *DeploymentRepo) UpdateStatus(id, status, ContainerID string, hostPort int) error {
+func (r *DeploymentRepo) UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int) error {
 	_, err := r.db.Exec(
-		`UPDATE deployments SET status=?, container_id=?, host_port=?, updated_at=?
-		WHERE id=?`, status, ContainerID, hostPort, time.Now(), id,
+		`UPDATE deployments SET status=?, container_id=?, image_tag=?, host_port=?, container_port=?, updated_at=?
+		WHERE id=?`, status, containerID, imageTag, hostPort, containerPort, time.Now(), id,
 	)
 	return err
 }

@@ -46,6 +46,13 @@ CREATE TABLE IF NOT EXISTS port_allocations (
     allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+--TEMPORARY
+INSERT INTO users (id, email, api_key_hash)
+SELECT 'test', 'test@gmail.com', '1234'
+WHERE NOT EXISTS (
+    SELECT 1 FROM users WHERE email = 'test@gmail.com'
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_deployments_user ON deployments(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_status ON deployments(status);

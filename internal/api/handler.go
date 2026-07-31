@@ -105,9 +105,7 @@ func (h *GlobalState)DeleteCgroup(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"Task": "completed"}})
 }
 
-func (h *GlobalState)GetContainers(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": state.SB.Sandbox.GetState().Containers})
-}
+
 
 func (h *GlobalState)StopContainers(c *gin.Context) {
 	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": container.StopAll(state.SB.Sandbox.GetState().Containers)})

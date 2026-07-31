@@ -25,3 +25,11 @@ func (h *GlobalState) DeleteContainer(c *gin.Context) {
 	}
 	c.JSON(http.StatusNoContent, gin.H{"message": "container deleted successfully"})
 }
+
+func (h *GlobalState)GetContainers(c *gin.Context) {
+	containers, err := h.Repos.Deployments.GetAll()
+	if err != nil {
+		c.JSON(http.StatusNoContent, err)
+	}	
+	c.JSON(http.StatusAccepted, containers)
+}

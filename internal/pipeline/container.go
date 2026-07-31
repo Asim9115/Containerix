@@ -34,6 +34,10 @@ func (h *State) DeleteContainer(containerID string) error {
 		log.Printf("[deletecontainer] failed to free port for container : %v", Container.ContainerID)
 		return fmt.Errorf("failed to delete container : %v", err)
 	}
+	state.SB.Ports.ReleasePort(Container.HostPort)
+
+	//--------------Remove container from sandbox map---------
+	state.SB.Sandbox.RemoveContainer(containerID)
 
 	//--------------Delete the container from DB---------
 	if err = h.Repo.Deployments.Delete(containerID); err != nil {

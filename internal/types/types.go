@@ -26,7 +26,6 @@ type Stats struct {
 type Config struct {
 	Name  string
 	Image string
-
 	Ports   []PortMapping
 	Env     map[string]string
 	Cmd     []string
@@ -46,7 +45,8 @@ type VolumeMount struct {
 
 type Container struct {
 	ID     string
-	Config Config
+	CPU    float64
+	Memory string
 	Status string
 }
 

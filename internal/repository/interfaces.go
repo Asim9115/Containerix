@@ -44,7 +44,7 @@ type DeploymentRepo interface {
     Create(d *Deployment) error
     GetByID(id string) (*Deployment, error)
     ListByUser(userID string) ([]Deployment, error)
-    UpdateStatus(id, status, containerID string, hostPort int) error
+    UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int) error
     UpdateError(id, status, errMsg string) error
     Delete(id string) error
     ListByStatus(status string) ([]Deployment, error)
