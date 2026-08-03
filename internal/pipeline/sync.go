@@ -2,26 +2,36 @@ package pipeline
 
 import (
 	"log"
+	"strconv"
 
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/types"
 )
-//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host
-func (h *State) SyncData() {
-	repos := h.Repo
 
+type Data struct {
+		CPU float64
+		Memory string
+		Ports map[int]string
+	}
+
+//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host
+func (h *State) SyncData() *Data {
+	repos := h.Repo
+	log.Println("[sync] Running sync data")
 	//1. Get the process that are in currently in cgroup.procs
 	pids, err := cgroup.GetProcesses()
 	if err != nil {
 		log.Printf("[sync] processes not found : %v", err)
-		return
+		return nil
 	}
-
+	log.Printf("[sync]process found : %v", pids)
 	// 2. Map container IDs currently active on the host
 	hostContainersIDMap := make(map[string]bool)
 	for _, pid := range pids {
-		containerId, err := docker.GetContainerFromPID(pid)
+		containerId, err := docker.GetContainerIDFromPID(pid)
+		log.Printf("containerId : %v", containerId)
 		if err != nil {
 			log.Printf("[sync] failed to get containerId of %v", pid)
 			continue
@@ -35,14 +45,14 @@ func (h *State) SyncData() {
 	dbContainers, err := repos.Deployments.ListByStatus("running")
 	if err != nil {
 		log.Printf("[sync] error geeting containers from database : %v", err)
-		return
+		return nil
 	}
 
 	//4. map database containers ID
 	dbContainersMap := make(map[string]bool)
 	for _, dbContainer := range dbContainers {
-		if dbContainer.ID != "" {
-			dbContainersMap[dbContainer.ID] = true
+		if dbContainer.ContainerID != "" {
+			dbContainersMap[dbContainer.ContainerID] = true
 		}
 	}
 	//5. reconcile host -> database
@@ -67,4 +77,30 @@ func (h *State) SyncData() {
 		}
 	}
 
+	SyncedContainers, err := h.Repo.Deployments.ListByStatus("running")
+	if err != nil {
+		log.Printf("[sync] error getting synced containers from database")
+	}
+
+	 Data := &Data{} 
+	 var Memory int
+	// calcultate the total cpu and memory to update in sandbox
+	for _, container := range SyncedContainers{
+		Data.CPU += container.TierCPU
+		stringMemory, err := types.MemoryToBytes(container.TierMemory)
+		if err != nil {
+			log.Printf("[sync]cant convert memory : %v -> %v", container.TierMemory, err)
+		}
+		newMemory, err :=  strconv.Atoi(stringMemory)
+		if err != nil {
+			log.Printf("[sync] cant convert to int %v -> %v",newMemory, err)
+		}
+		Memory += newMemory
+
+		Data.Ports[container.ContainerPort] = container.ContainerID
+	}
+	Data.Memory = strconv.Itoa(Memory)
+	log.Printf("[sync] sandbox data to sync : %v", Data)
+	return Data
 }
+

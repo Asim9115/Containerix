@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
-	"os"
 
 	"github.com/asim9115/containerix/internal/types"
+	"github.com/moby/moby/client"
 )
 func RunContainer(cfg types.Config) error {
 	if len(cfg.Ports) == 0{
@@ -239,47 +240,68 @@ func StreamContainerLogs(ctx context.Context, containerName string, outCh chan<-
 // 	return containerIDs, nil
 // }
 
-func GetContainerFromPID(pid string) (string, error) {
-	cgroupPath := filepath.Join("/proc", pid, "cgroup")
 
-	file, err := os.Open(cgroupPath)
+
+// containerIDFromCgroup reads /proc/<pid>/cgroup to extract the 64-char Docker
+// container ID embedded in the cgroup path. Works for every thread in the
+// container (not just the init process), since all threads share the same cgroup.
+// Returns "" without error if the PID doesn't belong to a Docker container.
+func containerIDFromCgroup(pid string) string {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%s/cgroup", pid))
 	if err != nil {
-		return "", fmt.Errorf("failed to open %s: %w", cgroupPath, err)
+		return ""
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Docker container ID is usually a 64-character hex string.
-		parts := strings.Split(line, "/")
-
-		for i := len(parts) - 1; i >= 0; i-- {
-			value := strings.TrimSpace(parts[i])
-
-			if len(value) == 64 && isHex(value) {
-				return value, nil
-			}
+	// Docker embeds the full 64-char container ID in the cgroup path, e.g.:
+	//   cgroup v2:  0::/system.slice/docker-<ID>.scope
+	//   cgroup v1:  12:devices:/docker/<ID>
+	re := regexp.MustCompile(`[a-f0-9]{64}`)
+	for _, line := range strings.Split(string(data), "\n") {
+		if match := re.FindString(line); match != "" {
+			return match
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("failed reading %s: %w", cgroupPath, err)
-	}
-
-	return "", nil
+	return ""
 }
 
-func isHex(s string) bool {
-	for _, c := range s {
-		if !((c >= '0' && c <= '9') ||
-			(c >= 'a' && c <= 'f') ||
-			(c >= 'A' && c <= 'F')) {
-			return false
+func GetContainerIDFromPID(pid string) (string, error) {
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return "", fmt.Errorf("docker client init: %w", err)
+	}
+	defer cli.Close()
+	ctx := context.Background()
+
+	// Strategy 1: read the 64-char container ID from /proc/<pid>/cgroup.
+	// This works for ALL threads in a container (not just the init PID).
+	if fullID := containerIDFromCgroup(pid); fullID != "" {
+		log.Printf("[docker] pid %s -> cgroup container ID %s", pid, fullID[:12])
+		inspect, err := cli.ContainerInspect(ctx, fullID, client.ContainerInspectOptions{})
+		if err == nil && len(inspect.Container.Name) > 0 {
+			return strings.TrimPrefix(inspect.Container.Name, "/"), nil
 		}
 	}
 
-	return true
+	// Strategy 2 (fallback): match State.Pid against the given PID.
+	// Only matches the container init process, not its child threads.
+	pidInt, err := strconv.Atoi(pid)
+	if err != nil {
+		return "", nil
+	}
+	result, err := cli.ContainerList(ctx, client.ContainerListOptions{All: false})
+	if err != nil {
+		return "", fmt.Errorf("container list: %w", err)
+	}
+	for _, c := range result.Items {
+		inspect, err := cli.ContainerInspect(ctx, c.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			continue
+		}
+		if inspect.Container.State != nil && inspect.Container.State.Pid == pidInt {
+			if len(c.Names) > 0 {
+				return strings.TrimPrefix(c.Names[0], "/"), nil
+			}
+			return c.ID, nil
+		}
+	}
+	return "", nil
 }

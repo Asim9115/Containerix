@@ -35,6 +35,17 @@ func main() {
      // 4. Create pipeline (gets DB access via repos)
      p := pipeline.New(repos)
 
+     //5. Run Reconcile
+    data := p.SyncData()
+     
+    state.SB.Sandbox.UpdateResources(data.CPU, data.Memory)
+    //update host ports
+
+    //replace the container port with actual record or use db 
+    
+    for port, id := range data.Ports{
+        state.SB.Ports.Reserve(id, port, port)
+    }
     log.Fatal(http.ListenAndServe(":8080", router.NewRouter(repos, p)))
 
 }
