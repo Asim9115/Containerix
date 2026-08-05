@@ -38,7 +38,7 @@ func main() {
      //5. Run Reconcile
     data := p.SyncData()
      
-    state.SB.Sandbox.UpdateResources(data.CPU, data.Memory)
+    state.SB.Sandbox.Allocate(data.CPU, data.Memory)
     //update host ports
 
     //replace the container port with actual record or use db 
