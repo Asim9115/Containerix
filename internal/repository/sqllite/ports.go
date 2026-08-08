@@ -7,13 +7,6 @@ import (
 	"github.com/asim9115/containerix/internal/repository"
 )
 
-// CREATE TABLE IF NOT EXISTS port_allocations (
-//     host_port INTEGER PRIMARY KEY,
-//     container_id TEXT NOT NULL,
-//     container_port INTEGER NOT NULL,
-//     allocated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-// );
-
 type PortsRepo struct {
 	db *sql.DB
 }

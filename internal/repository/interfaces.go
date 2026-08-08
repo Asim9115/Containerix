@@ -39,6 +39,14 @@ type Ports struct {
     AllocatedAt time.Time
 }
 
+type User struct {
+    ID string
+    Name string
+    Email string
+    ApiKeyHash string
+    CreatedAt time.Time
+}
+
 // DeploymentRepo — swap the implementation to switch databases
 type DeploymentRepo interface {
     Create(d *Deployment) error
@@ -71,8 +79,20 @@ type PortsRepo interface {
     GetAll() ([]Ports, error)
 }
 
+//User
+type UserRepo interface {
+    Create(u *User) error
+    Delete(ID string) error
+    UpdateEmail(ID string, email string) error
+    UpdateName(ID string, name string) error
+    GetUser(ID string) (*User, error)
+    GetAll() ([]User, error)
+
+}
+
 type Repos struct {
     Deployments DeploymentRepo
     Jobs JobRepo
     Ports PortsRepo
+    Users UserRepo
 }
