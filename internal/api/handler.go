@@ -3,16 +3,19 @@ package api
 import (
 	"context"
 	"fmt"
+
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/middleware"
+
+	"log"
+	"net/http"
+	"time"
 
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"log"
-	"net/http"
-	"time"
 )
 
 type BuildRequest struct {
@@ -61,7 +64,7 @@ func (h *GlobalState)CreateDockerImage(c *gin.Context) {
 		Jobs.Update(jobId, func(j *Job) {
 			j.Status = StatusBuilding
 		})
-		containerID, err := h.Pipeline.Deploy(jobId, logBus, body.Url, tier, body.Env)
+		containerID, err := h.Pipeline.Deploy(c.GetString(middleware.UserIDKey),jobId, logBus, body.Url, tier, body.Env)
 		if err != nil {
 			Jobs.Update(jobId, func(j *Job) {
 				j.Status = StatusFailed

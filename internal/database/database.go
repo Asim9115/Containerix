@@ -45,12 +45,6 @@ func Init(dbPath string) error {
 		return fmt.Errorf("migrations: %w", err)
 	}
 
-	// Ensure default test user exists to satisfy foreign key constraints
-	_, err = db.Exec(`INSERT OR IGNORE INTO users (id, email, api_key_hash) VALUES ('test', 'test@containerix.local', 'test_key')`)
-	if err != nil {
-		return fmt.Errorf("seed test user: %w", err)
-	}
-
 	log.Println("Database initialized:", dbPath)
 	return nil
 }

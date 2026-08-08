@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,7 +28,8 @@ func (h *GlobalState) DeleteContainer(c *gin.Context) {
 }
 
 func (h *GlobalState)GetContainers(c *gin.Context) {
-	containers, err := h.Repos.Deployments.GetAll()
+	userID := c.GetString(middleware.UserIDKey)
+	containers, err := h.Repos.Deployments.ListByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusNoContent, err)
 	}	

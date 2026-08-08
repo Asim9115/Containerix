@@ -9,6 +9,7 @@ import (
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/repository/sqllite"
 	"github.com/asim9115/containerix/internal/state"
+	"github.com/asim9115/containerix/internal/types"
 	"github.com/asim9115/containerix/router"
 )
 
@@ -25,6 +26,7 @@ func main() {
        Deployments: sqllite.NewDeploymentRepo(db),
        Jobs:        sqllite.NewJobRepo(db),
        Ports:       sqllite.NewPortsRepo(db),
+       User:        sqllite.NewUserRepo(db),
    }
 
      // 3. Init sandbox (cgroup — stays in-memory, this is OS state)
@@ -38,13 +40,23 @@ func main() {
      //5. Run Reconcile
     data := p.SyncData()
      
-    state.SB.Sandbox.Allocate(data.CPU, data.Memory)
-    //update host ports
-
-    //replace the container port with actual record or use db 
-    
-    for port, id := range data.Ports{
-        state.SB.Ports.Reserve(id, port, port)
+    if data != nil {
+        state.SB.Sandbox.Allocate(data.CPU, data.Memory)
+        
+        for port, id := range data.Ports {
+            state.SB.Ports.Reserve(id, port, port)
+        }
+        // Register running containers into the sandbox map
+        for _, c := range data.Containers {
+            state.SB.Sandbox.AddContainer(&types.Container{
+                ID:     c.ID,
+                CPU:    c.CPU,
+                Memory: c.Memory,
+                Status: "running",
+            })
+        }
+    } else {
+        log.Println("[sync] Warning: cgroups or processes not found. Skipping resource pre-allocation.")
     }
     log.Fatal(http.ListenAndServe(":8080", router.NewRouter(repos, p)))
 

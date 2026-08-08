@@ -80,3 +80,26 @@ func (r *UserRepo) GetAll() ([]repository.User, error) {
 	}
 	return users, nil
 }
+
+func (r *UserRepo) GetByApiKeyHash(key string) (*repository.User, error) {
+	user := &repository.User{}
+	err := r.db.QueryRow(`SELECT id, name, email, api_key_hash, created_at FROM users WHERE api_key_hash=?`, key).Scan(
+		&user.ID,
+		&user.Name,
+		&user.Email,
+		&user.ApiKeyHash,
+		&user.CreatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (r *UserRepo)UpdateApiKeyHash(ID string, key string) error{
+	_, err := r.db.Exec(`UPDATE users SET api_key_hash=? WHERE id=?`, key, ID)
+	return err
+}

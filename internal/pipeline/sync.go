@@ -10,10 +10,17 @@ import (
 	"github.com/asim9115/containerix/internal/types"
 )
 
+type SyncContainer struct {
+    ID     string
+    CPU    float64
+    Memory string
+}
+
 type Data struct {
-		CPU float64
-		Memory string
-		Ports map[int]string
+	CPU float64
+	Memory string
+	Ports map[int]string
+	Containers []SyncContainer
 	}
 
 //Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host
@@ -82,7 +89,9 @@ func (h *State) SyncData() *Data {
 		log.Printf("[sync] error getting synced containers from database")
 	}
 
-	 Data := &Data{} 
+	Data := &Data{
+    Ports: make(map[int]string),
+}
 	 var Memory int
 	// calcultate the total cpu and memory to update in sandbox
 	for _, container := range SyncedContainers{
@@ -97,7 +106,13 @@ func (h *State) SyncData() *Data {
 		}
 		Memory += newMemory
 
-		Data.Ports[container.ContainerPort] = container.ContainerID
+		Data.Ports[container.HostPort] = container.ContainerID
+		Data.Containers = append(Data.Containers, SyncContainer{
+            ID:     container.ContainerID,
+            CPU:    container.TierCPU,
+            Memory: container.TierMemory,
+        }) 
+	
 	}
 	Data.Memory = strconv.Itoa(Memory)
 	log.Printf("[sync] sandbox data to sync : %v", Data)

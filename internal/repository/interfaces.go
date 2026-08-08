@@ -85,14 +85,15 @@ type UserRepo interface {
     Delete(ID string) error
     UpdateEmail(ID string, email string) error
     UpdateName(ID string, name string) error
+    UpdateApiKeyHash(ID string, key string) error
     GetUser(ID string) (*User, error)
+    GetByApiKeyHash(key string) (*User, error)
     GetAll() ([]User, error)
-
 }
 
 type Repos struct {
     Deployments DeploymentRepo
     Jobs JobRepo
     Ports PortsRepo
-    Users UserRepo
+    User UserRepo
 }

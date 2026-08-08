@@ -1,6 +1,7 @@
 -- Users & Auth
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
+    name TEXT,
     email TEXT UNIQUE NOT NULL,
     api_key_hash TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -47,10 +48,14 @@ CREATE TABLE IF NOT EXISTS port_allocations (
 );
 
 --TEMPORARY
-INSERT INTO users (id, email, api_key_hash)
-SELECT 'test', 'test@gmail.com', '1234'
+INSERT INTO users (id, name, email, api_key_hash)
+SELECT 
+    'test-user-001',
+    'Test User', 
+    'test@containerix.local',
+    '73e9645393777bd3b23819103a85969c556ed6bfa4728c2de81bb207add9e2aa' -- real sha256 hash
 WHERE NOT EXISTS (
-    SELECT 1 FROM users WHERE email = 'test@gmail.com'
+    SELECT 1 FROM users WHERE email = 'test@containerix.local'
 );
 
 -- Indexes
