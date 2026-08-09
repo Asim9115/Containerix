@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"sync"
+
+
 )
 
 const (
@@ -29,6 +31,7 @@ type PortManager interface {
 	ReleaseAll()
 	IsUsed(hostPort int) bool
 	GetAllocation(hostPort int) (PortAllocation, bool)
+	GetAllData() []PortAllocation
 }
 
 func New() *Manager {
@@ -133,4 +136,14 @@ func (m *Manager) GetAllocation(hostPort int) (PortAllocation, bool) {
 
 	allocation, exists := m.usedPorts[hostPort]
 	return allocation, exists
+}
+
+func (m *Manager) GetAll() map[int]PortAllocation {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ports := make(map[int]PortAllocation, 0)
+	for i, port := range m.usedPorts {
+		ports[i] = port
+	}
+	return ports
 }

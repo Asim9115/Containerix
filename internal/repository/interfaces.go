@@ -55,10 +55,12 @@ type DeploymentRepo interface {
     UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int) error
     UpdateError(id, status, errMsg string) error
     Delete(id string) error
+    DeleteByContainerID(containerID string) error
     ListByStatus(status string) ([]Deployment, error)
     GetAll() ([]Deployment, error)
     GetByContainerId(containerID string) (*Deployment, error)
     UpdateStatusByContainerID(containerID string, status string) error
+    UpdateStatusAndPort(containerID string, status string, hostPort int) error
 }
 
 // JobRepo — swap the implementation to switch databases

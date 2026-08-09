@@ -40,7 +40,7 @@ func (h *State) DeleteContainer(containerID string) error {
 	state.SB.Sandbox.RemoveContainer(containerID)
 
 	//--------------Delete the container from DB---------
-	if err = h.Repo.Deployments.Delete(containerID); err != nil {
+	if err = h.Repo.Deployments.DeleteByContainerID(containerID); err != nil {
 		log.Printf("[deletecontainer] failed to delete container from db : %v", err)
 		return fmt.Errorf("failed to delete container : %v", err)
 	}

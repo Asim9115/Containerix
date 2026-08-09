@@ -129,6 +129,13 @@ func (r *DeploymentRepo) Delete(id string) error {
 	return nil
 }
 
+func (r *DeploymentRepo) DeleteByContainerID(containerID string) error {
+	_, err := r.db.Exec(`DELETE FROM deployments where container_id=?`, containerID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (r *DeploymentRepo) ListByStatus(status string) ([]repository.Deployment, error) {
 	deployments := make([]repository.Deployment, 0)
 	rows, err := r.db.Query(`SELECT id, user_id, repo_url, status,
@@ -257,5 +264,11 @@ func (r *DeploymentRepo)UpdateStatusByContainerID(containerID string, status str
 	_, err := r.db.Exec(`
 	UPDATE deployments SET status=? WHERE container_id=?
 	`, status, containerID)
+	return err
+}
+
+func (r *DeploymentRepo) UpdateStatusAndPort(containerID string, status string, hostPort int) error {
+	_, err := r.db.Exec(`
+	UPDATE deployments SET status=?, host_port=? WHERE container_id=?`, status, hostPort, containerID)
 	return err
 }

@@ -78,8 +78,12 @@ func (h *State) SyncData() *Data {
 	for dbContainer := range dbContainersMap {
 		if !hostContainersIDMap[dbContainer] {
 			log.Printf("[Sync] Updating out-of-sync DB container to stopped: %s", dbContainer)
-			if err := repos.Deployments.UpdateStatusByContainerID(dbContainer, "stopped"); err != nil {
+			if err := repos.Deployments.UpdateStatusAndPort(dbContainer, "stopped", 0); err != nil {
 				log.Printf("[Sync] Failed to update deployment status for %s: %v", dbContainer, err)
+			}
+			// add free port and update the db container
+			if err := repos.Ports.DeleteByContainerID(dbContainer); err != nil {
+				log.Printf("[sync] Failed to delete port in db : %v", err)
 			}
 		}
 	}
