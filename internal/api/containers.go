@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+//get user container by id
 func (h *GlobalState) GetContainer(c *gin.Context) {
 	containerID := c.Param("id")
 	container, err := h.Repos.Deployments.GetByContainerId(containerID)
@@ -27,6 +28,8 @@ func (h *GlobalState) DeleteContainer(c *gin.Context) {
 	c.JSON(http.StatusNoContent, gin.H{"message": "container deleted successfully"})
 }
 
+
+//List by user
 func (h *GlobalState)GetContainers(c *gin.Context) {
 	userID := c.GetString(middleware.UserIDKey)
 	containers, err := h.Repos.Deployments.ListByUser(userID)
@@ -35,3 +38,4 @@ func (h *GlobalState)GetContainers(c *gin.Context) {
 	}	
 	c.JSON(http.StatusAccepted, containers)
 }
+

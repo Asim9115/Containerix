@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-	"github.com/asim9115/containerix/internal/state"
+	//"github.com/asim9115/containerix/internal/state"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,9 +13,4 @@ func (h *GlobalState) GetPorts(c *gin.Context) {
 	return
 	}
 	c.JSON(http.StatusFound, ports)
-}
-
-func (h *GlobalState) GetAllPorts(c *gin.Context) {
-	data := state.SB.Ports.GetAll()
-	c.JSON(http.StatusFound, data)
 }

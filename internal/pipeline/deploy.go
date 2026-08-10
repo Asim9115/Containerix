@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -28,33 +27,16 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 		}
 	}
 
-	//-----------1. Create deployment record in DB---------
-	var envJSON []byte
-	if env != nil {
-		envJSON, _ = json.Marshal(env)
-	} else {
-		envJSON = []byte("{}")
-	}
-
-	deployment := &repository.Deployment{
-		ID:         jobId,
-		UserID:     userId,
-		RepoURL:    url,
-		Status:     "building",
-		TierName:   tier.Name,
-		TierCPU:    tier.Cpu,
-		TierMemory: tier.Memory,
-		EnvJSON:    string(envJSON),
-	}
-	if err := h.Repo.Deployments.Create(deployment); err != nil {
-		log.Printf("[pipeline] failed to create deployment record: %v", err)
-	}
+	// Deployment record has already been created by the handler synchronously.
 
 	// Helper function to handle failures
 	handleFailure := func(err error) (string, error) {
 		log.Printf("Pipeline Error - Deploy failed: %v", err)
 		if errUpdate := h.Repo.Deployments.UpdateError(jobId, "failed", err.Error()); errUpdate != nil {
 			log.Printf("[pipeline] failed to update error in DB: %v", errUpdate)
+		}
+		if errJob := h.Repo.Jobs.SetFailed(jobId, err.Error()); errJob != nil {
+			log.Printf("[pipeline] failed to mark job failed in DB: %v", errJob)
 		}
 		emit("error: " + err.Error())
 		return "", err
@@ -69,6 +51,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	emit("checking sandbox resources")
 	//--------------2. Check sandbox resources------------------
 	log.Print("checking sandbox resources")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "checking sandbox resources")
 	err = state.SB.Sandbox.CanAllocate(cpu, memory)
 	if err != nil {
 		return handleFailure(err)
@@ -95,6 +78,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	//----------------4. Clone the repository-------------------
 	log.Printf("Cloning Repo : %s", url)
 	emit("cloning repository...")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "cloning repository")
 	path, err := builder.CloneRepository(url)
 	if err != nil {
 		cleanup()
@@ -105,6 +89,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	//---------------5. Build Docker Image---------------------
 	log.Printf("Building Docker image")
 	emit("Building Docker image...")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "building docker image")
 	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
 		cleanup()
@@ -135,6 +120,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	docker.DeleteContainer(probeName)
 
 	//-----------------8. Check internal free port ----------------------
+	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "allocating host port")
 	hostPort, err := state.SB.Ports.GetFreePort()
 	if err != nil {
 		cleanup()
@@ -155,7 +141,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	log.Printf("config : %v", cfg)
 
 	//---------------10. Reserve the port------------------
-	state.SB.Ports.Reserve(cfg.Name, hostPort, containerPort)
+	state.SB.Ports.MarkAsUsed(hostPort)
 	portReserved := true
 	
 	err = h.Repo.Ports.Create(&repository.Ports{
@@ -169,7 +155,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 
 	cleanupWithPort := func() {
 		if portReserved {
-			state.SB.Ports.ReleasePort(hostPort)
+			state.SB.Ports.MarkFree(hostPort)
 			_ = h.Repo.Ports.FreePort(hostPort)
 		}
 		cleanup()
@@ -177,6 +163,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 
 	//------------11. Start the container-------------
 	log.Println("Starting Container")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "starting container")
 	cfg, err = container.Run(cfg)
 	if err != nil {
 		cleanupWithPort()

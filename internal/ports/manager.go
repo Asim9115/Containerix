@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-
-
 )
 
 const (
@@ -14,136 +12,64 @@ const (
 )
 
 type Manager struct {
-	usedPorts map[int]PortAllocation
+	usedPorts map[int]struct{}
 	mu        sync.Mutex
 }
 
-type PortAllocation struct {
-	ContainerId   string
-	ContainerPort int
-}
-
 type PortManager interface {
-	AllocatePort(containerId string, hostPort int, containerPort int) (int, error)
 	GetFreePort() (int, error)
-	Reserve(containerId string, hostPort int, containerPort int) error
-	ReleasePort(hostPort int)
+	MarkAsUsed(hostPort int) 
+	MarkFree(hostPort int)
 	ReleaseAll()
 	IsUsed(hostPort int) bool
-	GetAllocation(hostPort int) (PortAllocation, bool)
-	GetAllData() []PortAllocation
 }
 
 func New() *Manager {
 	return &Manager{
-		usedPorts: make(map[int]PortAllocation),
+		usedPorts: make(map[int]struct{}),
 	}
 }
 
-func (m *Manager) AllocatePort(containerId string, hostPort int, containerPort int) (int, error) {
+
+func (m *Manager) GetFreePort() (int , error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// auto assign free port
-	if hostPort == 0 {
-		freePort, err := m.getFreePortLocked()
-		if err != nil {
-			return 0, err
+	for port := StartPort;  port <= EndPort; port++ {
+		if _, exists := m.usedPorts[port]; exists {
+			continue
 		}
-		hostPort = freePort
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			continue //os is using this port
+		}
+		ln.Close()
+		return port, nil
 	}
-
-	if _, exists := m.usedPorts[hostPort]; exists {
-		return 0, fmt.Errorf("host port %d already allocated", hostPort)
-	}
-
-	address := fmt.Sprintf(":%d", hostPort)
-	ln, err := net.Listen("tcp", address)
-	if err != nil {
-		return 0, fmt.Errorf("host port %d already in use", hostPort)
-	}
-	ln.Close()
-
-	m.usedPorts[hostPort] = PortAllocation{
-		ContainerId:   containerId,
-		ContainerPort: containerPort,
-	}
-	return hostPort, nil
+	return 0, fmt.Errorf("no free ports avilable in range %d-%d", StartPort, EndPort)
 }
 
-func (m *Manager) IsUsed(port int) bool {
+func (m *Manager) MarkFree(hostPort int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	_, exists := m.usedPorts[port]
+	delete(m.usedPorts, hostPort)
+}
+
+func (m *Manager) MarkAsUsed(hostPort int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.usedPorts[hostPort] = struct{}{}
+}
+
+func (m *Manager) IsUsed(hostPort int) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, exists := m.usedPorts[hostPort]
 	return exists
-}
-
-func (m *Manager) ReleasePort(port int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.usedPorts, port)
 }
 
 func (m *Manager) ReleaseAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	clear(m.usedPorts)
-}
-
-func (m *Manager) GetFreePort() (int, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.getFreePortLocked()
-}
-
-func (m *Manager) getFreePortLocked() (int, error) {
-	for port := StartPort; port <= EndPort; port++ {
-		if _, exists := m.usedPorts[port]; exists {
-			continue
-		}
-
-		address := fmt.Sprintf(":%d", port)
-		ln, err := net.Listen("tcp", address)
-		if err != nil {
-			continue
-		}
-		ln.Close()
-
-		return port, nil
-	}
-	return 0, fmt.Errorf("no free ports available in range %d-%d", StartPort, EndPort)
-}
-
-func (m *Manager) Reserve(containerId string, hostPort int, containerPort int) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if _, exists := m.usedPorts[hostPort]; exists {
-		return fmt.Errorf("host port %d already reserved", hostPort)
-	}
-
-	m.usedPorts[hostPort] = PortAllocation{
-		ContainerId:   containerId,
-		ContainerPort: containerPort,
-	}
-
-	return nil
-}
-
-func (m *Manager) GetAllocation(hostPort int) (PortAllocation, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	allocation, exists := m.usedPorts[hostPort]
-	return allocation, exists
-}
-
-func (m *Manager) GetAll() map[int]PortAllocation {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	ports := make(map[int]PortAllocation, 0)
-	for i, port := range m.usedPorts {
-		ports[i] = port
-	}
-	return ports
 }

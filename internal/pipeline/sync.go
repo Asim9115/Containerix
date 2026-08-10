@@ -48,8 +48,8 @@ func (h *State) SyncData() *Data {
 		}
 	}
 
-	//3. Get all containers that are in marked as running in database
-	dbContainers, err := repos.Deployments.ListByStatus("running")
+	//3. Get all containers that are in marked as active in database
+	dbContainers, err := repos.Deployments.ListByStatus("active")
 	if err != nil {
 		log.Printf("[sync] error geeting containers from database : %v", err)
 		return nil

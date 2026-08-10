@@ -2,10 +2,11 @@ package api
 
 import (
 	"sync"
-	"time"
+
 	"github.com/asim9115/containerix/internal/types"
 )
 
+// JobStatus string constants — kept here so handlers can reference them.
 type JobStatus string
 
 const (
@@ -15,68 +16,56 @@ const (
 	StatusFailed   JobStatus = "failed"
 )
 
-type Job struct {
-	ID          string    `json:"job_id"`
-	Status      JobStatus `json:"status"`
-	Step        string    `json:"step,omitempty"`
-	ContainerID string    `json:"container_id,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-    HostPort      int       `json:"host_port,omitempty"`
-	//LogBus
-	LogBus *types.LogBus `json:"-"`
-	ContainerBus  *types.LogBus `json:"-"`
+type logEntry struct {
+	BuildBus     *types.LogBus // emits pipeline log 
+	ContainerBus *types.LogBus // emits docker container log 
 }
 
-type JobStore struct {
-	mu   sync.RWMutex
-	jobs map[string]*Job
+// LogBusRegistry is a minimal in-memory map for SSE channels.
+type LogBusRegistry struct {
+	mu      sync.RWMutex
+	entries map[string]*logEntry
 }
 
-var Jobs = &JobStore{jobs: make(map[string]*Job)}
+// Buses is the process-global registry
+var Buses = &LogBusRegistry{entries: make(map[string]*logEntry)}
 
-func (js *JobStore) Get(id string) (*Job, bool) {
-	js.mu.RLock()
-	defer js.mu.RUnlock()
-	job, ok := js.jobs[id]
-	return job, ok
+func (r *LogBusRegistry) Set(id string, build *types.LogBus) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries[id] = &logEntry{BuildBus: build}
 }
 
-func (js *JobStore) Set(id string, job *Job) {
-	js.mu.Lock()
-	defer js.mu.Unlock()
-	js.jobs[id] = job
+func (r *LogBusRegistry) GetBuild(id string) (*types.LogBus, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	e, ok := r.entries[id]
+	if !ok {
+		return nil, false
+	}
+	return e.BuildBus, true
 }
 
-func (js *JobStore) Update(id string, fn func(*Job)) {
-	js.mu.Lock()
-	defer js.mu.Unlock()
-	if j, ok := js.jobs[id]; ok {
-		fn(j)
+func (r *LogBusRegistry) AttachContainerBus(id string, bus *types.LogBus) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if e, ok := r.entries[id]; ok {
+		e.ContainerBus = bus
 	}
 }
 
-func (js *JobStore) GetByContainerID(id string) (*Job, bool) {
-	js.mu.RLock()
-	defer js.mu.RUnlock()
-
-	for _, job := range js.jobs{
-		if job.ContainerID == id {
-			return job, true
-		}
+func (r *LogBusRegistry) GetContainerBus(id string) (*types.LogBus, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	e, ok := r.entries[id]
+	if !ok || e.ContainerBus == nil {
+		return nil, false
 	}
-	return nil, false
+	return e.ContainerBus, true
 }
 
-func (js *JobStore) GetAll()([]Job) {
-	js.mu.Lock()
-	defer js.mu.Unlock()
-
-	//create slice to hold jobs
-	result := make([]Job, 0, len(js.jobs))
-
-	for _, job := range js.jobs {
-		result = append(result, *job)
-	} 
-	return result
+func (r *LogBusRegistry) Delete(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.entries, id)
 }

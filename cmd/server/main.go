@@ -43,8 +43,8 @@ func main() {
     if data != nil {
         state.SB.Sandbox.Allocate(data.CPU, data.Memory)
         
-        for port, id := range data.Ports {
-            state.SB.Ports.Reserve(id, port, port)
+        for port, _ := range data.Ports {
+            state.SB.Ports.MarkAsUsed(port)
         }
         // Register running containers into the sandbox map
         for _, c := range data.Containers {
