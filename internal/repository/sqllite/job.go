@@ -58,42 +58,13 @@ func (r *JobRepo) SetFailed(id, errMsg string) error {
 }
 
 func (r *JobRepo) SetCompleted(id, containerID string, hostPort int) error {
-	tx, err := r.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
-	// 1. Update the job status
-	_, err = tx.Exec(`
+	_, err := r.db.Exec(`
 		UPDATE jobs 
 		SET status='completed', completed_at=? 
 		WHERE id=?
 	`, time.Now(), id)
-	if err != nil {
-		return err
-	}
-
-	// 2. Find the deployment ID associated with the job
-	var deploymentID string
-	err = tx.QueryRow(`SELECT deployment_id FROM jobs WHERE id=?`, id).Scan(&deploymentID)
-	if err != nil {
-		return err
-	}
-
-	// 3. Update the deployment status to active and record container details
-	if deploymentID != "" {
-		_, err = tx.Exec(`
-			UPDATE deployments 
-			SET status='active', container_id=?, host_port=?, updated_at=? 
-			WHERE id=?
-		`, containerID, hostPort, time.Now(), deploymentID)
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+	return err
 }
 
 func (r *JobRepo) GetAll() ([]repository.Job, error) {
