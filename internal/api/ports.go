@@ -12,5 +12,5 @@ func (h *GlobalState) GetPorts(c *gin.Context) {
 	c.JSON(http.StatusNotFound, err)
 	return
 	}
-	c.JSON(http.StatusFound, ports)
+	c.JSON(http.StatusOK, ports)
 }

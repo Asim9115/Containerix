@@ -25,7 +25,7 @@ func (h *GlobalState) DeleteContainer(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusNoContent, gin.H{"message": "container deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "container deleted successfully"})
 }
 
 
@@ -34,7 +34,7 @@ func (h *GlobalState)GetContainers(c *gin.Context) {
 	userID := c.GetString(middleware.UserIDKey)
 	containers, err := h.Repos.Deployments.ListByUser(userID)
 	if err != nil {
-		c.JSON(http.StatusNoContent, err)
+		c.JSON(http.StatusInternalServerError, err)
 		return
 	}	
 	c.JSON(http.StatusOK, containers)

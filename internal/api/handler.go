@@ -174,7 +174,8 @@ func (h *GlobalState) GetJob(c *gin.Context) {
 // GetAllJobs — GET /jobs
 // Returns all jobs from the DB.
 func (h *GlobalState) GetAllJobs(c *gin.Context) {
-	jobs, err := h.Repos.Jobs.GetAll()
+	userID := c.GetString(middleware.UserIDKey)
+	jobs, err := h.Repos.Jobs.ListByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list jobs"})
 		return
