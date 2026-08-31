@@ -29,11 +29,12 @@ func (r *DeploymentRepo) GetByID(id string) (*repository.Deployment, error) {
 		`SELECT id, user_id, repo_url, status, 
 		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
 		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
-		        tier_name, COALESCE(error, ''), created_at, updated_at
+		        tier_name, COALESCE(tier_cpu, 0.0), COALESCE(tier_memory, ''),
+		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at
          FROM deployments WHERE id = ?`, id,
 	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
 		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
-		&d.Error, &d.CreatedAt, &d.UpdatedAt)
+		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -245,11 +246,12 @@ func (r *DeploymentRepo) GetByContainerId(containerID string) (*repository.Deplo
 	err := r.db.QueryRow(`SELECT id, user_id, repo_url, status, 
 		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
 		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
-		        tier_name, COALESCE(error, ''), created_at, updated_at
+		        tier_name, COALESCE(tier_cpu, 0.0), COALESCE(tier_memory, ''),
+		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at
          FROM deployments WHERE container_id = ?`, containerID,
 	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
 		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
-		&d.Error, &d.CreatedAt, &d.UpdatedAt)
+		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

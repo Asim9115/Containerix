@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS deployments (
     error TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Jobs (replaces in-memory JobStore)
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     error TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     completed_at DATETIME,
-    FOREIGN KEY (deployment_id) REFERENCES deployments(id)
+    FOREIGN KEY (deployment_id) REFERENCES deployments(id) ON DELETE CASCADE
 );
 
 -- Port allocations (replaces in-memory ports.Manager tracking)

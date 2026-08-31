@@ -116,3 +116,8 @@ func (r *JobRepo) GetAll() ([]repository.Job, error) {
 	}
 	return jobs, rows.Err()
 }
+
+func (r *JobRepo) DeleteByDeploymentID(deploymentID string) error {
+	_, err := r.db.Exec(`DELETE FROM jobs WHERE deployment_id = ? OR id = ?`, deploymentID, deploymentID)
+	return err
+}

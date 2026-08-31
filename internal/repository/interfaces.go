@@ -71,6 +71,7 @@ type JobRepo interface {
     SetFailed(id, errMsg string) error
     SetCompleted(id, containerID string, hostPort int) error
     GetAll() ([]Job, error)
+    DeleteByDeploymentID(deploymentID string) error
 }
 
 //PortsRepo

@@ -41,17 +41,33 @@ func (s *SandboxManager) Release(cpu float64, memory string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	newCpu := s.UsedCpu - cpu
-	freeMemory, err := strconv.Atoi(memory)
-	if err != nil {
-		return err
+	if newCpu < 0 {
+		newCpu = 0
 	}
-	usedMemory, err := strconv.Atoi(s.UsedMemory)
-	if err != nil {
-		return err
+
+	var freeMemory int64
+	if memory != "" {
+		memBytes, err := types.MemoryToBytes(memory)
+		if err != nil {
+			memBytes = memory
+		}
+		if parsed, err := strconv.ParseInt(memBytes, 10, 64); err == nil {
+			freeMemory = parsed
+		}
 	}
+
+	usedMemory, err := strconv.ParseInt(s.UsedMemory, 10, 64)
+	if err != nil {
+		usedMemory = 0
+	}
+
 	newMemory := usedMemory - freeMemory
+	if newMemory < 0 {
+		newMemory = 0
+	}
+
 	s.UsedCpu = newCpu
-	s.UsedMemory = strconv.Itoa(newMemory)
+	s.UsedMemory = strconv.FormatInt(newMemory, 10)
 	return nil
 }
 

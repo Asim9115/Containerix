@@ -10,22 +10,38 @@ import (
 )
 
 func (h *State) DeleteContainer(containerID string) error {
-	//1. Get container configuration to update state and sandbox resources
+	// 1. Get container configuration to update state and sandbox resources.
+	// Try looking up by container_id first, then fallback to deployment id.
 	Container, err := h.Repo.Deployments.GetByContainerId(containerID)
 	if err != nil {
 		return err
 	}
-	//---------------Stop docker container------------
-	err = container.Stop(Container.ContainerID)
-	if err != nil {
-		log.Printf("[deletecontainer] failed to stop container : %v", Container.ContainerID)
+	if Container == nil {
+		Container, err = h.Repo.Deployments.GetByID(containerID)
+		if err != nil {
+			return err
+		}
 	}
-	//---------------Delete container from system------
-	err = container.DeleteContainer(&types.Container{ID: Container.ContainerID, CPU: Container.TierCPU, Memory: Container.TierMemory,
-	Status: Container.Status})
-	if err != nil {
-		log.Printf("[deletecontainer] error deletring container : %v", err)
-		return err
+	if Container == nil {
+		return fmt.Errorf("deployment/container %q not found", containerID)
+	}
+
+	// ---------------Stop docker container------------
+	if Container.ContainerID != "" {
+		err = container.Stop(Container.ContainerID)
+		if err != nil {
+			log.Printf("[deletecontainer] warning - failed to stop container %s: %v", Container.ContainerID, err)
+		}
+		// ---------------Delete container from system------
+		err = container.DeleteContainer(&types.Container{
+			ID:     Container.ContainerID,
+			CPU:    Container.TierCPU,
+			Memory: Container.TierMemory,
+			Status: Container.Status,
+		})
+		if err != nil {
+			log.Printf("[deletecontainer] error deleting container: %v", err)
+		}
 	}
 	//---------------. Free resources----------------------
 	err = state.SB.Sandbox.Release(Container.TierCPU, Container.TierMemory)
@@ -44,9 +60,16 @@ func (h *State) DeleteContainer(containerID string) error {
 
 	//--------------Remove container from sandbox map---------
 	state.SB.Sandbox.RemoveContainer(containerID)
+	if Container.ContainerID != "" {
+		state.SB.Sandbox.RemoveContainer(Container.ContainerID)
+	}
 
-	//--------------Delete the container from DB---------
-	if err = h.Repo.Deployments.DeleteByContainerID(containerID); err != nil {
+	//--------------Delete associated jobs and deployment from DB---------
+	if err := h.Repo.Jobs.DeleteByDeploymentID(Container.ID); err != nil {
+		log.Printf("[deletecontainer] warning - failed to delete jobs for deployment %s: %v", Container.ID, err)
+	}
+
+	if err = h.Repo.Deployments.Delete(Container.ID); err != nil {
 		log.Printf("[deletecontainer] failed to delete container from db : %v", err)
 		return fmt.Errorf("failed to delete container : %v", err)
 	}
