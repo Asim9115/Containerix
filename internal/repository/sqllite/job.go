@@ -92,3 +92,24 @@ func (r *JobRepo) DeleteByDeploymentID(deploymentID string) error {
 	_, err := r.db.Exec(`DELETE FROM jobs WHERE deployment_id = ? OR id = ?`, deploymentID, deploymentID)
 	return err
 }
+
+func (r *JobRepo) ListByUser(userID string) ([]repository.Job, error) {
+	var jobs []repository.Job
+	rows, err := r.db.Query(`SELECT j.id, j.deployment_id, j.status, COALESCE(j.step, ''),
+	COALESCE(j.error, ''), j.created_At, j.completed_at FROM jobs j
+	JOIN deployments d ON d.id = j.deployment_id
+	WHERE d.user_id=? ORDER BY j.created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var job repository.Job
+		if err = rows.Scan(&job.ID, &job.DeploymentID, &job.Status, &job.Step, &job.Error, &job.CreatedAt, &job.CompletedAt); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, rows.Err()
+}

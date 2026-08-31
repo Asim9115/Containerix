@@ -2,6 +2,7 @@ package repository
 
 import (
 	"time"
+
 )
 
 type Deployment struct {
@@ -67,6 +68,7 @@ type DeploymentRepo interface {
 type JobRepo interface {
     Create(j *Job) error
     GetByID(id string) (*Job, error)
+    ListByUser(userID string) ([]Job, error)
     UpdateStatus(id, status, step string) error
     SetFailed(id, errMsg string) error
     SetCompleted(id, containerID string, hostPort int) error
