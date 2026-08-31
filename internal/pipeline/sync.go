@@ -7,6 +7,7 @@ import (
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/types"
 )
 
@@ -23,7 +24,11 @@ type Data struct {
 	Containers []SyncContainer
 	}
 
-//Sync the containers with database, performs stopping container if  in host and not in db and updating status if in db and not in host
+// SyncData reconciles the host cgroup state against the database:
+//   - Step 5: containers running on the host but absent from the DB → stop them (orphans).
+//   - Step 6: containers marked "running" in the DB but absent from the host → mark them "stopped".
+// It returns a Data snapshot of every container that survived both checks so that
+// main.go can restore in-memory sandbox resources and port allocations on startup.
 func (h *State) SyncData() *Data {
 	repos := h.Repo
 	log.Println("[sync] Running sync data")
@@ -48,10 +53,11 @@ func (h *State) SyncData() *Data {
 		}
 	}
 
-	//3. Get all containers that are in marked as active in database
-	dbContainers, err := repos.Deployments.ListByStatus("active")
+	// 3. Fetch every deployment the DB considers "running".
+	// "active" was the old (wrong) value — the schema and pipeline both use "running".
+	dbContainers, err := repos.Deployments.ListByStatus("running")
 	if err != nil {
-		log.Printf("[sync] error geeting containers from database : %v", err)
+		log.Printf("[sync] error getting containers from database: %v", err)
 		return nil
 	}
 
@@ -88,38 +94,88 @@ func (h *State) SyncData() *Data {
 		}
 	}
 
-	SyncedContainers, err := h.Repo.Deployments.ListByStatus("running")
-	if err != nil {
-		log.Printf("[sync] error getting synced containers from database")
+	// 8. Reconcile port_allocations table.
+	// Two scenarios this catches:
+	//   a) Missing row  — the server crashed between MarkAsUsed and Ports.Create during a deploy.
+	//      The container is alive on the host but has no port_allocations row, so after a restart
+	//      the in-memory port manager won't know that port is taken → double allocation on next deploy.
+	//   b) Stale row — a container stopped (handled in step 6) but Ports.DeleteByContainerID failed
+	//      silently in a previous run, leaving a ghost row that permanently blocks the port.
+	existingPorts, portErr := repos.Ports.GetAll()
+	if portErr != nil {
+		log.Printf("[sync] could not fetch port_allocations for reconcile: %v", portErr)
+	} else {
+		// Build a set of ports that are already recorded in the DB.
+		allocatedInDB := make(map[int]bool, len(existingPorts))
+		for _, p := range existingPorts {
+			allocatedInDB[p.HostPort] = true
+		}
+
+		for _, c := range dbContainers {
+			if !hostContainersIDMap[c.ContainerID] {
+				continue // step 6 already dealt with this container
+			}
+			if c.HostPort > 0 && !allocatedInDB[c.HostPort] {
+				// Scenario (a): running container has no port_allocations row — re-insert it.
+				log.Printf("[sync] re-inserting missing port allocation: host=%d container=%s", c.HostPort, c.ContainerID)
+				if err := repos.Ports.Create(&repository.Ports{
+					HostPort:      c.HostPort,
+					ContainerID:   c.ContainerID,
+					ContainerPort: c.ContainerPort,
+				}); err != nil {
+					log.Printf("[sync] failed to re-insert port %d: %v", c.HostPort, err)
+				}
+			}
+		}
+
+		// Scenario (b): stale port_allocations rows whose container is no longer running.
+		for _, p := range existingPorts {
+			if !hostContainersIDMap[p.ContainerID] {
+				log.Printf("[sync] removing stale port allocation: host=%d container=%s", p.HostPort, p.ContainerID)
+				if err := repos.Ports.DeleteByContainerID(p.ContainerID); err != nil {
+					log.Printf("[sync] failed to remove stale port %d: %v", p.HostPort, err)
+				}
+			}
+		}
 	}
 
-	Data := &Data{
-    Ports: make(map[int]string),
-}
-	 var Memory int
-	// calcultate the total cpu and memory to update in sandbox
-	for _, container := range SyncedContainers{
-		Data.CPU += container.TierCPU
-		stringMemory, err := types.MemoryToBytes(container.TierMemory)
-		if err != nil {
-			log.Printf("[sync]cant convert memory : %v -> %v", container.TierMemory, err)
-		}
-		newMemory, err :=  strconv.Atoi(stringMemory)
-		if err != nil {
-			log.Printf("[sync] cant convert to int %v -> %v",newMemory, err)
-		}
-		Memory += newMemory
-
-		Data.Ports[container.HostPort] = container.ContainerID
-		Data.Containers = append(Data.Containers, SyncContainer{
-            ID:     container.ContainerID,
-            CPU:    container.TierCPU,
-            Memory: container.TierMemory,
-        }) 
-	
+	// 7. Build the Data snapshot from dbContainers, but only include containers
+	// that are actually alive on the host (i.e. survived step 5 & 6 above).
+	// We do NOT issue a second ListByStatus("running") query here because step 6
+	// may have just mutated some of those rows to "stopped" — a fresh query would
+	// race against those writes and could return stale data depending on DB timing.
+	data := &Data{
+		Ports: make(map[int]string),
 	}
-	Data.Memory = strconv.Itoa(Memory)
-	log.Printf("[sync] sandbox data to sync : %v", Data)
-	return Data
+	var totalMemory int
+	for _, c := range dbContainers {
+		// Skip containers that step 6 just marked as stopped.
+		if !hostContainersIDMap[c.ContainerID] {
+			continue
+		}
+		data.CPU += c.TierCPU
+
+		memBytes, err := types.MemoryToBytes(c.TierMemory)
+		if err != nil {
+			log.Printf("[sync] can't convert memory %q: %v", c.TierMemory, err)
+		} else {
+			n, err := strconv.Atoi(memBytes)
+			if err != nil {
+				log.Printf("[sync] can't parse memory bytes %q: %v", memBytes, err)
+			} else {
+				totalMemory += n
+			}
+		}
+
+		data.Ports[c.HostPort] = c.ContainerID
+		data.Containers = append(data.Containers, SyncContainer{
+			ID:     c.ContainerID,
+			CPU:    c.TierCPU,
+			Memory: c.TierMemory,
+		})
+	}
+	data.Memory = strconv.Itoa(totalMemory)
+	log.Printf("[sync] sandbox data to sync: %+v", data)
+	return data
 }
 

@@ -2,9 +2,11 @@ package pipeline
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/state"
-	"log"
+	"github.com/asim9115/containerix/internal/types"
 )
 
 func (h *State) DeleteContainer(containerID string) error {
@@ -19,8 +21,12 @@ func (h *State) DeleteContainer(containerID string) error {
 		log.Printf("[deletecontainer] failed to stop container : %v", Container.ContainerID)
 	}
 	//---------------Delete container from system------
-	// add delete container later
-
+	err = container.DeleteContainer(&types.Container{ID: Container.ContainerID, CPU: Container.TierCPU, Memory: Container.TierMemory,
+	Status: Container.Status})
+	if err != nil {
+		log.Printf("[deletecontainer] error deletring container : %v", err)
+		return err
+	}
 	//---------------. Free resources----------------------
 	err = state.SB.Sandbox.Release(Container.TierCPU, Container.TierMemory)
 	if err != nil {

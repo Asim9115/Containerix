@@ -33,4 +33,6 @@ go.work.sum
 
 NOTES.md
 temp/
+venv/
+*.md
 data/

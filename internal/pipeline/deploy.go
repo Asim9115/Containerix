@@ -57,7 +57,10 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 		return handleFailure(err)
 	}
 
-	state.SB.Sandbox.Allocate(cpu, memory)
+	err = state.SB.Sandbox.Allocate(cpu, memory)
+	if err != nil {
+		return handleFailure(err)
+	}
 	allocatedSandbox := true
 
 	// Cleanup callback if we fail after this point

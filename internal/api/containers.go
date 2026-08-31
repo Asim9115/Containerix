@@ -15,7 +15,7 @@ func (h *GlobalState) GetContainer(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusFound, container)
+	c.JSON(http.StatusOK, container)
 }
 
 func (h *GlobalState) DeleteContainer(c *gin.Context) {
@@ -35,7 +35,8 @@ func (h *GlobalState)GetContainers(c *gin.Context) {
 	containers, err := h.Repos.Deployments.ListByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusNoContent, err)
+		return
 	}	
-	c.JSON(http.StatusAccepted, containers)
+	c.JSON(http.StatusOK, containers)
 }
 
