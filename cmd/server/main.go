@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/asim9115/containerix/internal/config"
 	"github.com/asim9115/containerix/internal/database"
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/repository"
@@ -14,6 +20,8 @@ import (
 )
 
 func main() {
+
+    cfg := config.Load()
     // 1. Init database
     if err := database.Init("data/containerix.db"); err != nil {
         log.Fatal(err)
@@ -30,7 +38,7 @@ func main() {
    }
 
      // 3. Init sandbox (cgroup — stays in-memory, this is OS state)
-     if err := state.Init("containerix", 2, "3221225472"); err != nil {
+     if err := state.Init("containerix", cfg.SandboxCPU, cfg.SandboxMemory); err != nil {
          log.Fatal(err)
      }
 
@@ -58,6 +66,28 @@ func main() {
     } else {
         log.Println("[sync] Warning: cgroups or processes not found. Skipping resource pre-allocation.")
     }
-    log.Fatal(http.ListenAndServe(":8080", router.NewRouter(repos, p)))
 
+    srv := &http.Server{
+        Addr: cfg.ListenAddr,
+        Handler: router.NewRouter(repos, p),
+    }
+
+    go func(){
+        log.Printf("server listening on %s", cfg.ListenAddr)
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatal(err)
+        }
+    }()
+
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+    log.Printf("shutting down...")
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    if err := srv.Shutdown(ctx); err != nil {
+        log.Fatal("Forced shutdown:", err)
+    }
+    log.Println("Server stopped")
 }
