@@ -88,6 +88,7 @@ func (h *State) StopContainer(container repository.Deployment) error {
 	if err := state.SB.Sandbox.Release(container.TierCPU, container.TierMemory); err != nil {
 		return err
 	}
+	state.SB.Sandbox.RemoveContainer(container.ContainerID)
 	state.SB.Ports.MarkFree(container.HostPort)
 	
 	if err := h.Repo.Deployments.UpdateStatusAndPort(container.ContainerID, types.DeployStopped, 0); err != nil {

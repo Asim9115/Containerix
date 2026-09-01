@@ -53,5 +53,8 @@ func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
 	r.GET("/cgroup", h.GetCgroup)
 	r.DELETE("/cgroup", h.DeleteCgroup)
 	r.GET("/dbports", h.GetPorts)
+
+	r.GET("/health", h.Health)
+	r.GET("/ready", h.Ready)
 	return r
 }
