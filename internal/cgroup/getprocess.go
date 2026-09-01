@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 )
 
-func GetProcesses() ([]string, error){
-	path := filepath.Join(cgroupRoot,"/containerix/cgroup.procs")
+func GetProcesses(sandboxName string) ([]string, error) {
+	path := filepath.Join(cgroupRoot, sandboxName, "cgroup.procs")
 
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {

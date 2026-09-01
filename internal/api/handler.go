@@ -73,7 +73,7 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 		ID:         jobId,
 		UserID:     userID,
 		RepoURL:    body.Url,
-		Status:     "building",
+		Status:     types.DeployBuilding,
 		TierName:   tier.Name,
 		TierCPU:    tier.Cpu,
 		TierMemory: tier.Memory,
@@ -89,8 +89,8 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 	dbJob := &repository.Job{
 		ID:           jobId,
 		DeploymentID: jobId,
-		Status:       string(StatusQueued),
-		Step:         "queued",
+		Status:       types.JobQueued,
+		Step:         types.JobQueued,
 	}
 	if err := h.Repos.Jobs.Create(dbJob); err != nil {
 		log.Printf("[handler] failed to create job in DB: %v", err)
@@ -107,7 +107,7 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 		defer Buses.Delete(jobId) // clean up SSE entry when goroutine exits
 
 		// Mark as building
-		if err := h.Repos.Jobs.UpdateStatus(jobId, string(StatusBuilding), "starting pipeline"); err != nil {
+		if err := h.Repos.Jobs.UpdateStatus(jobId, types.JobBuilding, "starting pipeline"); err != nil {
 			log.Printf("[handler] failed to set job building: %v", err)
 		}
 
@@ -140,7 +140,7 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 
 	c.JSON(http.StatusAccepted, gin.H{
 		"job_id": jobId,
-		"status": "queued",
+		"status": types.JobQueued,
 		"logs":   "/containers/" + jobId + "/logs",
 	})
 }
@@ -219,7 +219,7 @@ func (h *GlobalState) StreamLogs(c *gin.Context) {
 
 	// ── Phase B: check if job failed (re-read from DB for accuracy) ──────────
 	job, _ = h.Repos.Jobs.GetByID(id)
-	if job != nil && job.Status == string(StatusFailed) {
+	if job != nil && job.Status == types.JobFailed {
 		fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", job.Error)
 		flusher.Flush()
 		return

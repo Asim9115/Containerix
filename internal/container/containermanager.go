@@ -61,7 +61,7 @@ func StopAll(containers map[string]*types.Container) map[string]*types.Container
 			log.Printf("failed to stop container %s: %v", c.ID, err)
 			continue
 		}
-		c.Status = "stopped"
+		c.Status = types.DeployStopped
 	}
 	return containers
 }
@@ -70,14 +70,14 @@ func StopAll(containers map[string]*types.Container) map[string]*types.Container
 func DeleteContainer(container *types.Container) error {
 	log.Printf("[container.DeleteContainer] Starting deletion for id=%q status=%q", container.ID, container.Status)
 
-	if container.Status != "stopped" {
+	if container.Status != types.DeployStopped {
 		log.Printf("[container.DeleteContainer] Container id=%q is not stopped (status=%q), stopping first", container.ID, container.Status)
 		err := Stop(container.ID)
 		if err != nil {
 			log.Printf("[container.DeleteContainer] FAIL — could not stop container id=%q: %v", container.ID, err)
 			return err
 		}
-		container.Status = "stopped"
+		container.Status = types.DeployStopped
 		log.Printf("[container.DeleteContainer] Container id=%q stopped successfully", container.ID)
 	} else {
 		log.Printf("[container.DeleteContainer] Container id=%q already stopped, skipping stop step", container.ID)

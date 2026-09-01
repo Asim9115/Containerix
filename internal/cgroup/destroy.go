@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/types"
 )
 
@@ -12,7 +14,7 @@ import (
 
 func Destroy(name string, rootpath string, containers map[string]*types.Container) error {
 	log.Printf("[cgroup.Destroy] Stopping all containers in sandbox %q", name)
-	//container.StopAll(containers)
+	container.StopAll(containers)
 	log.Printf("[cgroup.Destroy] All containers stopped, removing cgroup directory")
 	path := filepath.Join(rootpath, name)
 	log.Printf("[cgroup.Destroy] Removing cgroup path: %s", path)

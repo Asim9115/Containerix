@@ -8,6 +8,7 @@ import (
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/repository"
+	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
 )
 
@@ -33,7 +34,7 @@ func (h *State) SyncData() *Data {
 	repos := h.Repo
 	log.Println("[sync] Running sync data")
 	//1. Get the process that are in currently in cgroup.procs
-	pids, err := cgroup.GetProcesses()
+	pids, err := cgroup.GetProcesses(state.SB.Sandbox.GetState().Name)
 	if err != nil {
 		log.Printf("[sync] processes not found : %v", err)
 		return nil
@@ -55,7 +56,7 @@ func (h *State) SyncData() *Data {
 
 	// 3. Fetch every deployment the DB considers "running".
 	// "active" was the old (wrong) value — the schema and pipeline both use "running".
-	dbContainers, err := repos.Deployments.ListByStatus("running")
+	dbContainers, err := repos.Deployments.ListByStatus(types.DeployRunning)
 	if err != nil {
 		log.Printf("[sync] error getting containers from database: %v", err)
 		return nil
@@ -84,7 +85,7 @@ func (h *State) SyncData() *Data {
 	for dbContainer := range dbContainersMap {
 		if !hostContainersIDMap[dbContainer] {
 			log.Printf("[Sync] Updating out-of-sync DB container to stopped: %s", dbContainer)
-			if err := repos.Deployments.UpdateStatusAndPort(dbContainer, "stopped", 0); err != nil {
+			if err := repos.Deployments.UpdateStatusAndPort(dbContainer, types.DeployStopped, 0); err != nil {
 				log.Printf("[Sync] Failed to update deployment status for %s: %v", dbContainer, err)
 			}
 			// add free port and update the db container

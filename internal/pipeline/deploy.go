@@ -32,7 +32,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	// Helper function to handle failures
 	handleFailure := func(err error) (string, error) {
 		log.Printf("Pipeline Error - Deploy failed: %v", err)
-		if errUpdate := h.Repo.Deployments.UpdateError(jobId, "failed", err.Error()); errUpdate != nil {
+		if errUpdate := h.Repo.Deployments.UpdateError(jobId, types.DeployFailed, err.Error()); errUpdate != nil {
 			log.Printf("[pipeline] failed to update error in DB: %v", errUpdate)
 		}
 		if errJob := h.Repo.Jobs.SetFailed(jobId, err.Error()); errJob != nil {
@@ -51,7 +51,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	emit("checking sandbox resources")
 	//--------------2. Check sandbox resources------------------
 	log.Print("checking sandbox resources")
-	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "checking sandbox resources")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "checking sandbox resources")
 	err = state.SB.Sandbox.CanAllocate(cpu, memory)
 	if err != nil {
 		return handleFailure(err)
@@ -81,7 +81,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	//----------------4. Clone the repository-------------------
 	log.Printf("Cloning Repo : %s", url)
 	emit("cloning repository...")
-	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "cloning repository")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "cloning repository")
 	path, err := builder.CloneRepository(url)
 	if err != nil {
 		cleanup()
@@ -92,7 +92,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	//---------------5. Build Docker Image---------------------
 	log.Printf("Building Docker image")
 	emit("Building Docker image...")
-	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "building docker image")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "building docker image")
 	tag, err := builder.BuildDockerImage(path)
 	if err != nil {
 		cleanup()
@@ -123,7 +123,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	docker.DeleteContainer(probeName)
 
 	//-----------------8. Check internal free port ----------------------
-	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "allocating host port")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "allocating host port")
 	hostPort, err := state.SB.Ports.GetFreePort()
 	if err != nil {
 		cleanup()
@@ -166,7 +166,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 
 	//------------11. Start the container-------------
 	log.Println("Starting Container")
-	_ = h.Repo.Jobs.UpdateStatus(jobId, "building", "starting container")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "starting container")
 	cfg, err = container.Run(cfg)
 	if err != nil {
 		cleanupWithPort()
@@ -199,7 +199,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	})
 
 	//-----------15. Update container status in database---------
-	err = h.Repo.Deployments.UpdateStatus(jobId, "running", cfg.Name, tag, hostPort, containerPort)
+	err = h.Repo.Deployments.UpdateStatus(jobId, types.DeployRunning, cfg.Name, tag, hostPort, containerPort)
 	if err != nil {
 		log.Printf("[pipeline] error updating status in DB: %v", err)
 	}

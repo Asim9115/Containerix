@@ -23,7 +23,7 @@ func main() {
 
     cfg := config.Load()
     // 1. Init database
-    if err := database.Init("data/containerix.db"); err != nil {
+    if err := database.Init(cfg.DBPath); err != nil {
         log.Fatal(err)
    }
     defer database.Close()
@@ -38,7 +38,7 @@ func main() {
    }
 
      // 3. Init sandbox (cgroup — stays in-memory, this is OS state)
-     if err := state.Init("containerix", cfg.SandboxCPU, cfg.SandboxMemory); err != nil {
+     if err := state.Init(cfg.SandboxName, cfg.SandboxCPU, cfg.SandboxMemory); err != nil {
          log.Fatal(err)
      }
 
@@ -60,7 +60,7 @@ func main() {
                 ID:     c.ID,
                 CPU:    c.CPU,
                 Memory: c.Memory,
-                Status: "running",
+                Status: types.DeployRunning,
             })
         }
     } else {

@@ -41,11 +41,12 @@ func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
 		protected.GET("/deployments", h.ListMyDeployments)
 
 		// Cgroup (admin)
-		protected.GET("/cgroup", h.GetCgroup)
+		
 		
 		
 		
 	}
+	r.GET("/cgroup", h.GetCgroup)
 	r.DELETE("/cgroup", h.DeleteCgroup)
 	r.GET("/dbports", h.GetPorts)
 	return r

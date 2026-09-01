@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/asim9115/containerix/internal/repository"
+	"github.com/asim9115/containerix/internal/types"
 )
 
 type JobRepo struct {
@@ -51,19 +52,18 @@ func (r *JobRepo) UpdateStatus(id, status, step string) error {
 func (r *JobRepo) SetFailed(id, errMsg string) error {
 	_, err := r.db.Exec(`
 		UPDATE jobs 
-		SET status='failed', error=?, completed_at=? 
+		SET status=?, error=?, completed_at=? 
 		WHERE id=?
-	`, errMsg, time.Now(), id)
+	`, types.JobFailed, errMsg, time.Now(), id)
 	return err
 }
 
 func (r *JobRepo) SetCompleted(id, containerID string, hostPort int) error {
-
 	_, err := r.db.Exec(`
 		UPDATE jobs 
-		SET status='completed', completed_at=? 
+		SET status=?, completed_at=? 
 		WHERE id=?
-	`, time.Now(), id)
+	`, types.JobCompleted, time.Now(), id)
 	return err
 }
 
@@ -96,7 +96,7 @@ func (r *JobRepo) DeleteByDeploymentID(deploymentID string) error {
 func (r *JobRepo) ListByUser(userID string) ([]repository.Job, error) {
 	var jobs []repository.Job
 	rows, err := r.db.Query(`SELECT j.id, j.deployment_id, j.status, COALESCE(j.step, ''),
-	COALESCE(j.error, ''), j.created_At, j.completed_at FROM jobs j
+	COALESCE(j.error, ''), j.created_at, j.completed_at FROM jobs j
 	JOIN deployments d ON d.id = j.deployment_id
 	WHERE d.user_id=? ORDER BY j.created_at DESC
 	`, userID)
