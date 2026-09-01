@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/asim9115/containerix/internal/container"
+	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
 )
@@ -76,4 +78,37 @@ func (h *State) DeleteContainer(containerID string) error {
 
 	return nil
 
+}
+
+func (h *State) StopContainer(container repository.Deployment) error {
+	if err := docker.StopContainer(container.ContainerID); err != nil {
+		return fmt.Errorf("failed to stop container : %v", err)
+	}
+
+	if err := state.SB.Sandbox.Release(container.TierCPU, container.TierMemory); err != nil {
+		return err
+	}
+	state.SB.Ports.MarkFree(container.ContainerPort)
+	
+	if err := h.Repo.Deployments.UpdateStatusAndPort(container.ContainerID, types.DeployStopped, 0); err != nil {
+		return err
+	}
+	return nil
+	
+}
+
+func (h *State) StopAllContainers(userID string)error {
+	containers, err := h.Repo.Deployments.ListByUser(userID)
+	if err != nil {
+		return err
+	}
+	for _, container := range containers {
+		if container.Status == types.DeployRunning {
+			err = h.StopContainer(container)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
