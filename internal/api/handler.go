@@ -1,15 +1,11 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/asim9115/containerix/internal/container"
-	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
@@ -98,15 +94,14 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 		return
 	}
 
-	// ── 3. Register SSE channels (transient, in-memory only) ─────────────────
+	// ── 3. Register build log bus (transient, in-memory only) ────────────────
 	logBus := types.NewLogBus()
-	Buses.Set(jobId, logBus)
+	BuildLogs.Set(jobId, logBus)
 
-	// ── 3. Launch pipeline in background ─────────────────────────────────────
+	// ── 4. Launch pipeline in background ─────────────────────────────────────
 	go func() {
-		defer Buses.Delete(jobId) // clean up SSE entry when goroutine exits
+		defer BuildLogs.Delete(jobId)
 
-		// Mark as building
 		if err := h.Repos.Jobs.UpdateStatus(jobId, types.JobBuilding, "starting pipeline"); err != nil {
 			log.Printf("[handler] failed to set job building: %v", err)
 		}
@@ -117,7 +112,6 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 				log.Printf("[handler] failed to mark job failed in DB: %v", setErr)
 			}
 		} else {
-			// Retrieve the host port that the pipeline recorded on the deployment
 			var hostPort int
 			if dep, depErr := h.Repos.Deployments.GetByContainerId(containerID); depErr == nil && dep != nil {
 				hostPort = dep.HostPort
@@ -125,15 +119,6 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 			if setErr := h.Repos.Jobs.SetCompleted(jobId, containerID, hostPort); setErr != nil {
 				log.Printf("[handler] failed to mark job completed in DB: %v", setErr)
 			}
-
-			// Attach live container log stream
-			containerBus := types.NewLogBus()
-			Buses.AttachContainerBus(jobId, containerBus)
-			go func() {
-				ctx := context.Background()
-				_ = docker.StreamContainerLogs(ctx, containerID, containerBus.Ch)
-				close(containerBus.Ch)
-			}()
 		}
 		close(logBus.Ch)
 	}()
@@ -181,71 +166,6 @@ func (h *GlobalState) GetAllJobs(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, jobs)
-}
-
-// StreamLogs — GET /containers/:id/logs
-// Phase A: drain the build-time SSE channel (in-memory, available only while
-//           the goroutine is alive).
-// Phase B: if deploy failed, emit error event and close.
-// Phase C: stream live container logs from docker.
-func (h *GlobalState) StreamLogs(c *gin.Context) {
-	id := c.Param("id")
-
-	// Verify job exists in DB
-	job, err := h.Repos.Jobs.GetByID(id)
-	if err != nil || job == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
-		return
-	}
-
-	// SSE headers
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	flusher, ok := c.Writer.(http.Flusher)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "streaming not supported"})
-		return
-	}
-
-	// ── Phase A: drain build-time log bus (if goroutine still running) ────────
-	if buildBus, alive := Buses.GetBuild(id); alive {
-		for evt := range buildBus.Ch {
-			fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", evt.Event, evt.Data)
-			flusher.Flush()
-		}
-	}
-
-	// ── Phase B: check if job failed (re-read from DB for accuracy) ──────────
-	job, _ = h.Repos.Jobs.GetByID(id)
-	if job != nil && job.Status == types.JobFailed {
-		fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", job.Error)
-		flusher.Flush()
-		return
-	}
-
-	// ── Phase C: stream live container logs ───────────────────────────────────
-	// ContainerBus may not be attached yet; poll briefly.
-	var containerBus *types.LogBus
-	for i := 0; i < 20; i++ {
-		if cb, found := Buses.GetContainerBus(id); found {
-			containerBus = cb
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if containerBus == nil {
-		fmt.Fprintf(c.Writer, "event: done\ndata: container logs unavailable\n\n")
-		flusher.Flush()
-		return
-	}
-	for evt := range containerBus.Ch {
-		fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", evt.Event, evt.Data)
-		flusher.Flush()
-	}
-	fmt.Fprintf(c.Writer, "event: done\ndata: container stopped\n\n")
-	flusher.Flush()
 }
 
 func (h *GlobalState) GetCgroup(c *gin.Context) {

@@ -190,32 +190,39 @@ func GetContainerIp(id string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// StreamContainerLogs attaches to a running container and forwards every log
-// line to outCh.  Returns when the container stops or ctx is cancelled.
-func StreamContainerLogs(ctx context.Context, containerName string, outCh chan<- types.SSEEvent) error {
-    cmd := exec.CommandContext(ctx, "docker", "logs", "-f", "--tail", "50", containerName)
+// StreamContainerLogs follows a running container and calls write for each line.
+// Returns when the container stops or ctx is cancelled (e.g. client disconnect).
+func StreamContainerLogs(ctx context.Context, containerName string, write func(types.SSEEvent) error) error {
+	cmd := exec.CommandContext(ctx, "docker", "logs", "-f", "--tail", "100", containerName)
 
-    pr, pw := io.Pipe()
-    cmd.Stdout = pw
-    cmd.Stderr = pw
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
 
-    if err := cmd.Start(); err != nil {
-        pw.Close()
-        return err
-    }
+	if err := cmd.Start(); err != nil {
+		pw.Close()
+		return err
+	}
 
-    scanner := bufio.NewScanner(pr)
-    for scanner.Scan() {
-        select {
-        case outCh <- types.SSEEvent{Event: "log", Data: scanner.Text()}:
-        case <-ctx.Done():
-            pw.Close()
-            cmd.Process.Kill()
-            return ctx.Err()
-        }
-    }
-    pw.Close()
-    return cmd.Wait()
+	go func() {
+		<-ctx.Done()
+		pw.Close()
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+	}()
+
+	scanner := bufio.NewScanner(pr)
+	for scanner.Scan() {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if err := write(types.SSEEvent{Event: "log", Data: scanner.Text()}); err != nil {
+			return err
+		}
+	}
+	pw.Close()
+	return cmd.Wait()
 }
 
 
