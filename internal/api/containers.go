@@ -61,6 +61,7 @@ func (h *GlobalState) StopContainer(c *gin.Context) {
 	containers, err := h.Repos.Deployments.ListByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err)
+		return
 	}
 	for _, container := range containers{
 		if container.ContainerID == containerID {
@@ -72,6 +73,7 @@ func (h *GlobalState) StopContainer(c *gin.Context) {
 				err := h.Pipeline.StopContainer(container)
 				if err != nil {
 					c.JSON(http.StatusBadRequest, err)
+					return
 				}
 				c.JSON(http.StatusAccepted, "successfully stopped the container")
 				return
@@ -86,6 +88,7 @@ func (h *GlobalState) StopAllContainers(c *gin.Context) {
 	err := h.Pipeline.StopAllContainers(userID)
 	if err != nil {
 		c.JSON(http.StatusConflict, err)
+		return
 	}
 	c.JSON(http.StatusAccepted, "successfully stopped all containers")
 }

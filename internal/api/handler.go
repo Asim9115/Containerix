@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/asim9115/containerix/internal/container"
+
 	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
@@ -181,6 +181,3 @@ func (h *GlobalState) DeleteCgroup(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"Task": "completed"}})
 }
 
-func (h *GlobalState) StopContainers(c *gin.Context) {
-	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": container.StopAll(state.SB.Sandbox.GetState().Containers)})
-}

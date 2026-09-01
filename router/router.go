@@ -28,15 +28,17 @@ func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
 
 		// Containers
 		protected.GET("/containers", h.GetContainers)
-		protected.DELETE("/containers/:id", h.DeleteContainer)
-		// protected.GET("/containers/:id/logs", h.StreamLogs)
 		protected.GET("/containers/:id", h.GetContainer)
-		protected.GET("/containers/stop/:id", h.StopContainer)
-		protected.GET("/containers/stopall", h.StopAllContainers)
+
+		protected.DELETE("/containers/:id", h.DeleteContainer)
+
+		protected.POST("/containers/:id/stop", h.StopContainer)
+		protected.POST("/containers/stop-all", h.StopAllContainers)
 
 		// Jobs
-		protected.GET("/jobs/:id", h.GetJob)
 		protected.GET("/jobs", h.GetAllJobs)
+		protected.GET("/jobs/:id", h.GetJob)
+
 
 		// User deployments (scoped to authenticated user)
 		protected.GET("/deployments", h.ListMyDeployments)
