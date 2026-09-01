@@ -17,7 +17,12 @@ type CreateUserRequest struct {
 }
 
 func (h *GlobalState) CreateUser(c *gin.Context) {
-    var body CreateUserRequest
+	if !h.AllowRegistration {
+		c.JSON(http.StatusForbidden, gin.H{"error": "registration is disabled"})
+		return
+	}
+
+	var body CreateUserRequest
     if err := c.ShouldBindJSON(&body); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return

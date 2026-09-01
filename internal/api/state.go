@@ -11,8 +11,9 @@ import (
 
 // GlobalState holds all dependencies injected into API handlers.
 type GlobalState struct {
-	Repos    *repository.Repos
-	Pipeline *pipeline.State
+	Repos             *repository.Repos
+	Pipeline          *pipeline.State
+	AllowRegistration bool
 }
 
 func (h *GlobalState) Health(c *gin.Context) {
@@ -26,18 +27,18 @@ func (h *GlobalState) Ready(c *gin.Context) {
 	} else {
 		checks["database"] = "ok"
 	}
-    if anyFailed(checks) {
-        c.JSON(503, gin.H{"status": "not_ready", "checks": checks})
-        return
-    }
-    c.JSON(200, gin.H{"status": "ready"})
-}	
+	if anyFailed(checks) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready", "checks": checks})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ready"})
+}
 
-func anyFailed(checks map[string]string) bool{
+func anyFailed(checks map[string]string) bool {
 	for _, val := range checks {
 		if val != "ok" {
 			return true
-		} 
+		}
 	}
-	return true
+	return false
 }

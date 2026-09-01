@@ -2,20 +2,25 @@ package router
 
 import (
 	"github.com/asim9115/containerix/internal/api"
+	"github.com/asim9115/containerix/internal/config"
 	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(repos *repository.Repos, p *pipeline.State) *gin.Engine {
+func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
-	h := &api.GlobalState{Repos: repos, Pipeline: p}
+	r.Use(
+		middleware.MaxBody(cfg.MaxRequestBody),
+		middleware.GlobalRateLimit(cfg.GlobalRateLimit, cfg.GlobalRateWindow),
+	)
+	h := &api.GlobalState{Repos: repos, Pipeline: p, AllowRegistration: cfg.AllowRegistration}
 
-	
-	r.POST("/users", h.CreateUser) 
-
-	
+	r.POST("/users",
+		middleware.RegistrationRateLimit(cfg.RegistrationRateLimit, cfg.RegistrationRateWindow),
+		h.CreateUser,
+	)
 	protected := r.Group("/")
 	protected.Use(middleware.RequestLogger(), middleware.APIKeyAuth(repos))
 	{

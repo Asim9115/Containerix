@@ -89,8 +89,13 @@ func (h *State) StopContainer(container repository.Deployment) error {
 		return err
 	}
 	state.SB.Sandbox.RemoveContainer(container.ContainerID)
-	state.SB.Ports.MarkFree(container.HostPort)
-	
+	if container.HostPort > 0 {
+		if err := h.Repo.Ports.FreePort(container.HostPort); err != nil {
+			log.Printf("[stopcontainer] failed to free port %d in db: %v", container.HostPort, err)
+		}
+		state.SB.Ports.MarkFree(container.HostPort)
+	}
+
 	if err := h.Repo.Deployments.UpdateStatusAndPort(container.ContainerID, types.DeployStopped, 0); err != nil {
 		return err
 	}
@@ -98,18 +103,19 @@ func (h *State) StopContainer(container repository.Deployment) error {
 	
 }
 
-func (h *State) StopAllContainers(userID string)error {
+func (h *State) StopAllContainers(userID string) ([]string, error) {
 	containers, err := h.Repo.Deployments.ListByUser(userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	stopped := make([]string, 0)
 	for _, container := range containers {
 		if container.Status == types.DeployRunning {
-			err = h.StopContainer(container)
-			if err != nil {
-				return err
+			if err = h.StopContainer(container); err != nil {
+				return stopped, err
 			}
+			stopped = append(stopped, container.ContainerID)
 		}
 	}
-	return nil
+	return stopped, nil
 }
