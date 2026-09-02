@@ -10,16 +10,20 @@ import (
 
 func (h *GlobalState) GetContainer(c *gin.Context) {
 	containerID := c.Param("id")
-	container, err := h.Repos.Deployments.GetByContainerId(containerID)
+	userID := c.GetString(middleware.UserIDKey)
+	containers, err := h.Repos.Deployments.ListByUser(userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get container"})
 		return
 	}
-	if container == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "container not found"})
-		return
+
+	for _, container := range containers {
+		if container.ContainerID == containerID {
+			c.JSON(http.StatusOK, container)
+			return
+		}
 	}
-	c.JSON(http.StatusOK, container)
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get container"})
 }
 
 func (h *GlobalState) DeleteContainer(c *gin.Context) {

@@ -36,7 +36,7 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 		protected.GET("/containers/:id", h.GetContainer)
 
 		protected.DELETE("/containers/:id", h.DeleteContainer)
-
+		protected.GET("/containers/:id/logs", h.StreamLogs)
 		protected.POST("/containers/:id/stop", h.StopContainer)
 		protected.POST("/containers/stop-all", h.StopAllContainers)
 
@@ -47,14 +47,13 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 
 		// User deployments (scoped to authenticated user)
 		protected.GET("/deployments", h.ListMyDeployments)
+		protected.GET("/deployments/:id", h.GetDeployment)
+		protected.DELETE("/deployments/:id", h.DeleteDeployment)
 
 		// Cgroup (admin)
 		
-		
-		
-		
 	}
-	r.GET("/containers/:id/logs", h.StreamLogs)
+
 	r.GET("/cgroup", h.GetCgroup)
 	r.DELETE("/cgroup", h.DeleteCgroup)
 	r.GET("/dbports", h.GetPorts)

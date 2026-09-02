@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-
 	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
@@ -133,27 +132,28 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 // GetJob — GET /jobs/:id
 func (h *GlobalState) GetJob(c *gin.Context) {
 	jobId := c.Param("id")
-
-	job, err := h.Repos.Jobs.GetByID(jobId)
+	userID := c.GetString(middleware.UserIDKey)
+	jobs, err := h.Repos.Jobs.ListByUser(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query job"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get job"})
 		return
 	}
-	if job == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
-		return
+	for _, job := range jobs {
+		if job.ID == jobId {
+			c.JSON(http.StatusOK, gin.H{
+				"job_id":        job.ID,
+				"deployment_id": job.DeploymentID,
+				"status":        job.Status,
+				"step":          job.Step,
+				"error":         job.Error,
+				"created_at":    job.CreatedAt,
+				"completed_at":  job.CompletedAt,
+				"logs":          "/containers/" + job.ID + "/logs",
+			})
+			return
+		}
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"job_id":        job.ID,
-		"deployment_id": job.DeploymentID,
-		"status":        job.Status,
-		"step":          job.Step,
-		"error":         job.Error,
-		"created_at":    job.CreatedAt,
-		"completed_at":  job.CompletedAt,
-		"logs":          "/containers/" + job.ID + "/logs",
-	})
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get job"})
 }
 
 // GetAllJobs — GET /jobs
@@ -180,4 +180,3 @@ func (h *GlobalState) DeleteCgroup(c *gin.Context) {
 	log.Println("cgroup deleted")
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"Task": "completed"}})
 }
-

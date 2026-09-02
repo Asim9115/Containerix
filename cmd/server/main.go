@@ -69,7 +69,7 @@ func main() {
 
     srv := &http.Server{
         Addr: cfg.ListenAddr,
-        Handler: router.NewRouter(repos, p),
+        Handler: router.NewRouter(repos, p, cfg),
     }
 
     go func(){

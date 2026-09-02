@@ -115,8 +115,14 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	ip, _ := docker.GetContainerIp(probeName)
 	containerPort, err := detector.ScanActivePort(ip)
 	if err != nil {
-		log.Printf("Pipeline Error - Failed to determine exposed port dynamically: %v", err)
-		containerPort = 3000 // Fallback
+		exposed, exposeErr := docker.GetExposedPorts(tag)
+		if exposeErr == nil && len(exposed) > 0 {
+			containerPort = exposed[0]
+			log.Printf("Using EXPOSE port %d from image", containerPort)
+		} else {
+			cleanup()
+			return handleFailure(fmt.Errorf("could not detect container port: %w", err))
+		}
 	}
 	log.Printf("Dynamically Detected Container Port: %d", containerPort)
 	docker.StopContainer(probeName)
