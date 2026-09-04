@@ -118,3 +118,31 @@ type SSEEvent struct {
 	Event string
 	Data  string
 }
+const DefaultAppPort = 10000
+
+type Language string
+
+const (
+	Python Language = "python"
+	Node   Language = "node"
+	Go     Language = "go"
+	Static Language = "static"
+)
+
+// BuildRequest is the POST /build body. Tier is the tier name string ("tier1"/"tier2");
+// ResolvedTier is filled by the handler before Deploy runs.
+type BuildRequest struct {
+	Name            string            `json:"name"`
+	Language        Language          `json:"language"`
+	BuildCommand    string            `json:"build_command"`
+	StartCommand    string            `json:"start_command"`
+	RootDirectory   string            `json:"root_directory"`
+	DockerfilePath  string            `json:"dockerfile_path"`
+	Port            int               `json:"port"`
+	HealthCheckPath string            `json:"health_check_path"`
+	Url             string            `json:"url"`
+	Tier            string            `json:"tier"`
+	Env             map[string]string `json:"env"`
+	ResolvedTier    Tier              `json:"-"`
+}
+

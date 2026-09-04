@@ -49,10 +49,11 @@ func (h *GlobalState) DeleteDeployment(c *gin.Context) {
 		if deploymentID == deployment.ID {
 			if err := h.Pipeline.DeleteContainer(deployment.ContainerID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete deployment"})
+				return
 			}
 			c.Status(http.StatusNoContent)
 			return
 		}
 	}
-	c.JSON(http.StatusNotFound, gin.H{"error": "deployment not found"})
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "deployment not found"})
 }

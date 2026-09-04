@@ -17,7 +17,7 @@ type Manager struct {
 }
 
 type PortManager interface {
-	GetFreePort() (int, error)
+	GetFreePortAndReserve() (int, error)
 	MarkAsUsed(hostPort int) 
 	MarkFree(hostPort int)
 	ReleaseAll()
@@ -31,7 +31,7 @@ func New() *Manager {
 }
 
 
-func (m *Manager) GetFreePort() (int , error) {
+func (m *Manager) GetFreePortAndReserve() (int , error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -44,6 +44,7 @@ func (m *Manager) GetFreePort() (int , error) {
 			continue //os is using this port
 		}
 		ln.Close()
+		m.usedPorts[port] = struct{}{}
 		return port, nil
 	}
 	return 0, fmt.Errorf("no free ports avilable in range %d-%d", StartPort, EndPort)
@@ -73,3 +74,4 @@ func (m *Manager) ReleaseAll() {
 	defer m.mu.Unlock()
 	clear(m.usedPorts)
 }
+

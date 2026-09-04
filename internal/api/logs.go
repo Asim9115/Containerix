@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/types"
 	"github.com/gin-gonic/gin"
@@ -19,16 +20,27 @@ import (
 func (h *GlobalState) StreamLogs(c *gin.Context) {
 	id := c.Param("id")
 	ctx := c.Request.Context()
-
-	job, err := h.Repos.Jobs.GetByID(id)
+	userID := c.GetString(middleware.UserIDKey)
+	jobs, err := h.Repos.Jobs.ListByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query job"})
 		return
 	}
-	if job == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+	var job *repository.Job;
+	found := false
+	for _, j := range jobs {
+		if j.ID == id {
+			found = true
+			job = &j
+			break
+		}
+	} 
+	
+	if !found {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get job"})
 		return
 	}
+
 
 	flusher, ok := setupSSE(c)
 	if !ok {

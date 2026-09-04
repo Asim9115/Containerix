@@ -13,11 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type BuildRequest struct {
-	Url  string            `json:"url"`
-	Tier string            `json:"tier"`
-	Env  map[string]string `json:"env"`
-}
+
 
 var availableTiers = map[string]types.Tier{
 	"tier1": types.Tier1,
@@ -29,7 +25,7 @@ var availableTiers = map[string]types.Tier{
 // deploy pipeline in a background goroutine. All status transitions are
 // written to the DB so they survive restarts.
 func (h *GlobalState) CreateDockerImage(c *gin.Context) {
-	var body BuildRequest
+	var body types.BuildRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request body"})
 		return
@@ -47,6 +43,10 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tier, use tier1 or tier2"})
 		return
+	}
+	body.ResolvedTier = tier
+	if body.Port <= 0 {
+		body.Port = types.DefaultAppPort
 	}
 
 	jobId := uuid.New().String()[:8]
@@ -105,7 +105,7 @@ func (h *GlobalState) CreateDockerImage(c *gin.Context) {
 			log.Printf("[handler] failed to set job building: %v", err)
 		}
 
-		containerID, err := h.Pipeline.Deploy(userID, jobId, logBus, body.Url, tier, body.Env)
+		containerID, err := h.Pipeline.Deploy(userID, jobId, logBus, &body)
 		if err != nil {
 			if setErr := h.Repos.Jobs.SetFailed(jobId, err.Error()); setErr != nil {
 				log.Printf("[handler] failed to mark job failed in DB: %v", setErr)
