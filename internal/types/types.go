@@ -126,6 +126,7 @@ const (
 	Python Language = "python"
 	Node   Language = "node"
 	Go     Language = "go"
+	Docker Language = "docker"
 	Static Language = "static"
 )
 

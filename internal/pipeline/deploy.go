@@ -4,32 +4,29 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/asim9115/containerix/internal/builder"
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
-	"github.com/asim9115/containerix/internal/detector"
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
 )
 
-func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url string, tier types.Tier, env map[string]string) (string, error) {
+func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *types.BuildRequest) (string, error) {
 
 	emit := func(msg string) {
-		// non-blocking send so a stalled client never freezes the pipeline
 		select {
 		case logBus.Ch <- types.SSEEvent{Event: "log", Data: msg}:
-		default: 
-			<-logBus.Ch
+		default:
+			<-logBus.Ch //removes the oldest message if full
 			logBus.Ch <- types.SSEEvent{Event: "log", Data: msg}
 		}
 	}
 
-	// Deployment record has already been created by the handler synchronously.
-
-	// Helper function to handle failures
 	handleFailure := func(err error) (string, error) {
 		log.Printf("Pipeline Error - Deploy failed: %v", err)
 		if errUpdate := h.Repo.Deployments.UpdateError(jobId, types.DeployFailed, err.Error()); errUpdate != nil {
@@ -42,14 +39,19 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 		return "", err
 	}
 
-	cpu := tier.Cpu
-	memory, err := types.MemoryToBytes(tier.Memory)
+	if req.Tier == "" {
+		req.Tier = types.Tier1.Name
+		req.ResolvedTier = types.Tier1
+	}
+
+	cpu := req.ResolvedTier.Cpu
+	memory, err := types.MemoryToBytes(req.ResolvedTier.Memory)
 	if err != nil {
 		memory = "524288000"
 	}
+	//--------------2. Check sandbox resources------------------
 
 	emit("checking sandbox resources")
-	//--------------2. Check sandbox resources------------------
 	log.Print("checking sandbox resources")
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "checking sandbox resources")
 	err = state.SB.Sandbox.CanAllocate(cpu, memory)
@@ -63,96 +65,69 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 	}
 	allocatedSandbox := true
 
-	// Cleanup callback if we fail after this point
 	cleanup := func() {
 		if allocatedSandbox {
 			_ = state.SB.Sandbox.Release(cpu, memory)
 		}
 	}
 
-	emit("validating url : " + url)
-	//----------------3. Validate url from url injection-------------
-	log.Printf("validating url : %s", url)
-	if err := builder.ValidateRepoUrl(url); err != nil {
-		cleanup()
-		return handleFailure(err)
-	}
+	emit("validating url : " + req.Url)
+		//----------------3. Validate url from url injection-------------
 
+	log.Printf("validating url : %s", req.Url)
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "validating")
+	if err := builder.ValidateRepoUrl(req.Url); err != nil {
+		cleanup()
+		return handleFailure(fmt.Errorf("validate: %w", err))
+	}
 	//----------------4. Clone the repository-------------------
-	log.Printf("Cloning Repo : %s", url)
+	log.Printf("Cloning Repo : %s", req.Url)
 	emit("cloning repository...")
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "cloning repository")
-	path, err := builder.CloneRepository(url)
+	path, err := builder.CloneRepository(req.Url)
 	if err != nil {
 		cleanup()
-		return handleFailure(err)
+		return handleFailure(fmt.Errorf("clone: %w", err))
 	}
 	defer os.RemoveAll(path)
 
-	//---------------5. Build Docker Image---------------------
-	log.Printf("Building Docker image")
-	emit("Building Docker image...")
-	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "building docker image")
-	tag, err := builder.BuildDockerImage(path)
+
+	//docker file and container 
+	containerPort := req.Port
+	if containerPort <= 0 {
+		containerPort = types.DefaultAppPort
+	}
+	tag, err := builder.BuildDockerImage(logBus , req, path)
 	if err != nil {
 		cleanup()
-		return handleFailure(err)
+		return handleFailure(fmt.Errorf("builder: %w", err))
 	}
-
-	//---------------6. Probe to detect active container port--------------
-	probeName := tag + "-probe"
-	log.Printf("Running probe container %s to detect port", probeName)
-	err = docker.RunContainerWithoutPorts(types.Config{
-		Image: tag,
-		Tier:  tier,
-	}, probeName)
-	if err != nil {
-		cleanup()
-		return handleFailure(err)
-	}
-
-	//----------------7. Get container port---------------
-	ip, _ := docker.GetContainerIp(probeName)
-	containerPort, err := detector.ScanActivePort(ip)
-	if err != nil {
-		exposed, exposeErr := docker.GetExposedPorts(tag)
-		if exposeErr == nil && len(exposed) > 0 {
-			containerPort = exposed[0]
-			log.Printf("Using EXPOSE port %d from image", containerPort)
-		} else {
-			cleanup()
-			return handleFailure(fmt.Errorf("could not detect container port: %w", err))
-		}
-	}
-	log.Printf("Dynamically Detected Container Port: %d", containerPort)
-	docker.StopContainer(probeName)
-	docker.DeleteContainer(probeName)
-
 	//-----------------8. Check internal free port ----------------------
+
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "allocating host port")
-	hostPort, err := state.SB.Ports.GetFreePort()
+	hostPort, err := state.SB.Ports.GetFreePortAndReserve()
 	if err != nil {
 		cleanup()
-		return handleFailure(err)
+		return handleFailure(fmt.Errorf("port: %w", err))
 	}
 	log.Printf("Free Port : %d", hostPort)
+	portReserved := true
 
+	env := mergePlatformEnv(containerPort, req.Env)
 	//-----------------9. Prepare container config----------------------
+
 	cfg := types.Config{
 		Name:  tag,
 		Image: tag,
-		Tier:  tier,
+		Tier:  req.ResolvedTier,
 		Env:   env,
 		Ports: []types.PortMapping{
 			{HostPort: hostPort, ContainerPort: containerPort},
 		},
 	}
 	log.Printf("config : %v", cfg)
-
 	//---------------10. Reserve the port------------------
-	state.SB.Ports.MarkAsUsed(hostPort)
-	portReserved := true
-	
+
 	err = h.Repo.Ports.Create(&repository.Ports{
 		HostPort:      hostPort,
 		ContainerID:   cfg.Name,
@@ -169,47 +144,56 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 		}
 		cleanup()
 	}
-
 	//------------11. Start the container-------------
+
 	log.Println("Starting Container")
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "starting container")
 	cfg, err = container.Run(cfg)
 	if err != nil {
 		cleanupWithPort()
-		return handleFailure(err)
+		return handleFailure(fmt.Errorf("start: %w", err))
 	}
 
+	cleanupWithContainer := func() {
+		_ = docker.StopContainer(cfg.Name)
+		_ = docker.DeleteContainer(cfg.Name)
+		cleanupWithPort()
+	}
+
+	emit("waiting for app to become ready...")
+	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "waiting-ready")
+	// if err := readiness.WaitReady(cfg.Name, hostPort, req.HealthCheckPath, readiness.DefaultTimeout, emit); err != nil {
+	// 	cleanupWithContainer()
+	// 	return handleFailure(err)
+	// }
+	time.Sleep(5 * time.Second)
 	//--------------12. Get pid of the container to add in cgroup------------
 	pid, err := docker.GetPid(cfg.Name)
 	if err != nil {
-		_ = docker.StopContainer(cfg.Name)
-		cleanupWithPort()
+		cleanupWithContainer()
 		return handleFailure(err)
 	}
 	log.Printf("container pid: %d", pid)
-	docker.DeleteImage(cfg.Name)
-
+	_ = docker.DeleteImage(tag)
 	//------------13. Add pid to cgroup procs-------------------
+
 	if err := cgroup.AddProcess(state.SB.Sandbox.GetState().Name, pid); err != nil {
-		_ = docker.StopContainer(cfg.Name)
-		cleanupWithPort()
+		cleanupWithContainer()
 		return handleFailure(err)
 	}
 	log.Printf("process %d added to cgroup", pid)
-
 	//--------------14. Add container to sandbox------------
 	state.SB.Sandbox.AddContainer(&types.Container{
 		ID:     cfg.Name,
 		CPU:    cfg.Tier.Cpu,
 		Memory: cfg.Tier.Memory,
 	})
-
 	//-----------15. Update container status in database---------
+
 	err = h.Repo.Deployments.UpdateStatus(jobId, types.DeployRunning, cfg.Name, tag, hostPort, containerPort)
 	if err != nil {
 		log.Printf("[pipeline] error updating status in DB: %v", err)
 	}
-
 	//-------------16. Container Url-------------------
 	appUrl := fmt.Sprintf("http://localhost:%d", hostPort)
 	emit_event := func(event, data string) {
@@ -219,8 +203,20 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, url st
 		}
 	}
 	emit_event("deployed", appUrl)
-
-	//------17. Return container id----------
+//------17. Return container id----------
 	return cfg.Name, nil
 }
 
+func mergePlatformEnv(containerPort int, user map[string]string) map[string]string {
+	out := map[string]string{
+		"PORT": strconv.Itoa(containerPort),
+		"HOST": "0.0.0.0",
+	}
+	for k, v := range user {
+		out[k] = v
+	}
+	// Platform owns PORT so publish mapping always matches.
+	out["PORT"] = strconv.Itoa(containerPort)
+	out["HOST"] = "0.0.0.0"
+	return out
+}

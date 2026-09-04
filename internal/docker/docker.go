@@ -3,7 +3,6 @@ package docker
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -102,6 +101,24 @@ func DeleteImage(id string) error {
     return nil
 }
 
+// ContainerRunning reports whether the named container is currently running.
+func ContainerRunning(name string) (bool, error) {
+	out, err := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", name).CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("inspect %s: %s", name, strings.TrimSpace(string(out)))
+	}
+	return strings.TrimSpace(string(out)) == "true", nil
+}
+
+// TailLogs returns the last n lines of container logs.
+func TailLogs(name string, n int) (string, error) {
+	if n <= 0 {
+		n = 50
+	}
+	out, err := exec.Command("docker", "logs", "--tail", strconv.Itoa(n), name).CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
 // ForceRemoveContainer stops (if needed) and force-removes a container,
 // ignoring "no such container" errors so probe cleanup never blocks the pipeline.
 func ForceRemoveContainer(id string) {
@@ -115,71 +132,6 @@ func ForceRemoveContainer(id string) {
 			log.Printf("[docker] ForceRemoveContainer %s: %v — %s", id, err, outStr)
 		}
 	}
-}
-
-// GetExposedPorts returns the list of ports declared via EXPOSE in the image
-// (or in the container's Config if the container has already been created).
-// It inspects the *image*, so it works before a container is started.
-// Returns ports as integers; the protocol suffix ("/tcp") is stripped.
-func GetExposedPorts(imageTag string) ([]int, error) {
-	out, err := exec.Command(
-		"docker", "inspect",
-		"--type", "image",
-		"--format", "{{json .Config.ExposedPorts}}",
-		imageTag,
-	).Output()
-	if err != nil {
-		return nil, fmt.Errorf("docker inspect image %q: %w", imageTag, err)
-	}
-
-	trimmed := strings.TrimSpace(string(out))
-	if trimmed == "null" || trimmed == "" {
-		return nil, nil // image has no EXPOSE directive
-	}
-
-	// ExposedPorts is map[string]struct{} serialised as e.g. {"3000/tcp":{}}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
-		return nil, fmt.Errorf("parse ExposedPorts: %w", err)
-	}
-
-	ports := make([]int, 0, len(raw))
-	for key := range raw {
-		// key format: "3000/tcp", "8080/udp", etc.
-		parts := strings.SplitN(key, "/", 2)
-		p, err := strconv.Atoi(parts[0])
-		if err != nil {
-			continue
-		}
-		ports = append(ports, p)
-	}
-	return ports, nil
-}
-
-func RunContainerWithoutPorts(cfg types.Config, probeName string) error {
-	// NOTE: --read-only is intentionally omitted here.
-	// Many frameworks (Django, Rails, etc.) write .pyc / tmp files on startup.
-	// A read-only root FS causes the process to crash before it can bind a port,
-	// making port detection impossible. We use --tmpfs instead to keep /tmp writable
-	// while everything else stays inside the container's layered FS.
-	cmd := exec.Command(
-		"docker",
-		"run",
-		"-d",
-		"--name", probeName,
-		"--cpus", strconv.FormatFloat(cfg.Tier.Cpu, 'f', -1, 64),
-		"--memory", cfg.Tier.Memory,
-		"--memory-swap", cfg.Tier.Memory,
-		"--pids-limit", strconv.Itoa(cfg.Tier.PidsLimit),
-		"--security-opt", "no-new-privileges",
-		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-		cfg.Image,
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to start probe container: %s (err: %w)", string(output), err)
-	}
-	return nil
 }
 
 func GetContainerIp(id string) (string, error) {
@@ -224,30 +176,6 @@ func StreamContainerLogs(ctx context.Context, containerName string, write func(t
 	pw.Close()
 	return cmd.Wait()
 }
-
-
-// func GetAll() ([]string, error) {
-// 	pids, err := cgroup.GetProcesses()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	containerIDs := []string{}
-	
-// 	for _, pid := range pids {
-// 		containerID, err := GetContainerFromPID(pid)
-// 		if err != nil {
-// 			log.Printf("failed to get container for pid %s:%v", pid, err)
-// 			continue
-// 		}
-// 		if containerID == "" {
-// 			continue
-// 		}
-// 		containerIDs = append(containerIDs, containerID)
-// 	}
-// 	return containerIDs, nil
-// }
-
-
 
 // containerIDFromCgroup reads /proc/<pid>/cgroup to extract the 64-char Docker
 // container ID embedded in the cgroup path. Works for every thread in the
