@@ -14,17 +14,18 @@ import (
 func BuildDockerImage(logbus *types.LogBus, data *types.BuildRequest, path string) (string, error) {
 	id := uuid.New()
 	tag := "ctx-" + id.String()[:8]
+	buildCommand := buildLine(data.BuildCommand)
 	if data.Language != types.Docker {
 		var dockerFileContent string
 		switch data.Language {
 		case types.Python:
-			dockerFileContent = templates.GeneratePython(data.BuildCommand, data.RootDirectory, data.StartCommand, data.Port)
+			dockerFileContent = templates.GeneratePython(buildCommand, data.RootDirectory, data.StartCommand, data.Port)
 
 		case types.Node:
-			dockerFileContent = templates.GenerateNode(data.BuildCommand, data.RootDirectory, data.StartCommand, data.Port)
+			dockerFileContent = templates.GenerateNode(buildCommand, data.RootDirectory, data.StartCommand, data.Port)
 
 		case types.Go:
-			dockerFileContent = templates.GenerateGo(data.BuildCommand, data.RootDirectory, data.StartCommand, data.Port)
+			dockerFileContent = templates.GenerateGo(buildCommand, data.RootDirectory, data.StartCommand, data.Port)
 
 		default:
 			return "", fmt.Errorf("language not supported")
@@ -45,4 +46,11 @@ func BuildDockerImage(logbus *types.LogBus, data *types.BuildRequest, path strin
 		return "", fmt.Errorf("docker build failed: %w", err)
 	}
 	return tag, nil
+}
+
+func buildLine(cmd string) string {
+	if cmd == ""{
+		return ""
+	}
+	return "RUN " + cmd + "\n"
 }

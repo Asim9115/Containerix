@@ -6,7 +6,7 @@ import (
 )
 
 func TestGeneratePython(t *testing.T) {
-	got := GeneratePython(		"python manage.py collectstatic",
+	got := GeneratePython(		"RUN python manage.py collectstatic\n",
 		"/app",
 		"python manage.py runserver 0.0.0.0:8000",
 		8000,)

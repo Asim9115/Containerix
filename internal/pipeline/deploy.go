@@ -80,6 +80,10 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 		cleanup()
 		return handleFailure(fmt.Errorf("validate: %w", err))
 	}
+	if err := builder.ValidateBuildRequest(req); err != nil {
+		cleanup()
+		return handleFailure(fmt.Errorf("validate: %w", err))
+	}
 	//----------------4. Clone the repository-------------------
 	log.Printf("Cloning Repo : %s", req.Url)
 	emit("cloning repository...")

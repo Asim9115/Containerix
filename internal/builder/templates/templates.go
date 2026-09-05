@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN %s
+%s
 
 EXPOSE %d
 
@@ -30,7 +30,7 @@ RUN go mod download
 
 COPY . .
 
-RUN %s
+%s
 
 EXPOSE %d
 
@@ -48,7 +48,7 @@ RUN npm install
 
 COPY . .
 
-RUN %s
+%s
 
 EXPOSE %d
 
