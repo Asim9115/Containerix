@@ -10,6 +10,12 @@ import (
 var shellChars = []string{";", "&&", "||", "`", "$()", "|", ">", "<", "\n", "\r"}
 
 func ValidateBuildRequest(req *types.BuildRequest) error {
+
+	if req.RootDirectory != "" {
+		if strings.Contains(req.RootDirectory, "..") || strings.Contains(req.RootDirectory, "/") {
+			return fmt.Errorf("root directory must be a relative path without '..'")
+		}
+	}
 	for _, cmd := range []string{req.BuildCommand, req.StartCommand} {
 		if len(cmd) > 256 {
 			return fmt.Errorf("command too long (max 256 chars)")

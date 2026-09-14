@@ -6,6 +6,7 @@ import (
 	"github.com/asim9115/containerix/internal/middleware"
 	"github.com/asim9115/containerix/internal/pipeline"
 	"github.com/asim9115/containerix/internal/repository"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +15,13 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 	r.Use(
 		middleware.MaxBody(cfg.MaxRequestBody),
 		middleware.GlobalRateLimit(cfg.GlobalRateLimit, cfg.GlobalRateWindow),
+		cors.New(cors.Config{
+			AllowAllOrigins: true,
+			AllowMethods:[]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders: []string{"Content-Type", "X-API-Key", "Authorization"},
+		}),
 	)
+	
 	h := &api.GlobalState{Repos: repos, Pipeline: p, AllowRegistration: cfg.AllowRegistration}
 
 	r.POST("/users",

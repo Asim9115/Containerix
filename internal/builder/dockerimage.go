@@ -1,7 +1,9 @@
 package builder
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,17 +41,48 @@ func BuildDockerImage(logbus *types.LogBus, data *types.BuildRequest, path strin
 	}
 
 	cmd := exec.Command("docker", "build", "-t", tag, path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("docker build failed: %w", err)
+	pr, pw := io.Pipe()
+	cmd.Stdout = pw
+	cmd.Stderr = pw
+
+	if err := cmd.Start(); err != nil {
+		pw.Close()
+		return "", fmt.Errorf("docker build start: %w", err)
+	}
+
+	// Scanner runs in a goroutine so it doesn't block cmd.Wait().
+	scanDone := make(chan struct{})
+	go func() {
+		defer close(scanDone)
+		scanner := bufio.NewScanner(pr)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			select {
+			case logbus.Ch <- types.SSEEvent{Event: "log", Data: line}:
+			default:
+				<-logbus.Ch
+				logbus.Ch <- types.SSEEvent{Event: "log", Data: line}
+			}
+		}
+	}()
+
+	// Wait for docker build to finish then close pw so scanner sees EOF.
+	buildErr := cmd.Wait()
+	pw.Close()
+
+	// Wait for scanner goroutine to drain remaining lines before returning.
+	<-scanDone
+
+	if buildErr != nil {
+		return "", fmt.Errorf("docker build failed: %w", buildErr)
 	}
 	return tag, nil
 }
 
 func buildLine(cmd string) string {
-	if cmd == ""{
+	if cmd == "" {
 		return ""
 	}
 	return "RUN " + cmd + "\n"
