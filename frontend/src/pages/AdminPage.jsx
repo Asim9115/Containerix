@@ -50,7 +50,7 @@ export function AdminPage() {
   return (
     <div>
       <PageHeader
-        title="System"
+        title="Sandbox & ports"
         description="Platform health and resource monitoring"
       />
 

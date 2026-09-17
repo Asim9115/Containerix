@@ -1,6 +1,12 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
-import { ProtectedRoute, PublicRoute } from './components/auth/ProtectedRoute'
+import { AdminLayout } from './components/layout/AdminLayout'
+import {
+  ProtectedRoute,
+  PublicRoute,
+  AdminProtectedRoute,
+  AdminPublicRoute,
+} from './components/auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ServicesPage } from './pages/ServicesPage'
@@ -10,6 +16,7 @@ import { JobsPage } from './pages/JobsPage'
 import { JobDetailPage } from './pages/JobDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AdminPage } from './pages/AdminPage'
+import { AdminLoginPage } from './pages/AdminLoginPage'
 
 export default function App() {
   return (
@@ -28,7 +35,16 @@ export default function App() {
             <Route path="jobs" element={<JobsPage />} />
             <Route path="jobs/:id" element={<JobDetailPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="admin" element={<AdminPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<AdminPublicRoute />}>
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+        </Route>
+
+        <Route element={<AdminProtectedRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
         </Route>
       </Routes>

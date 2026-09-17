@@ -34,3 +34,24 @@ export function PublicRoute() {
 
   return <Outlet />
 }
+
+/** Admin console — separate from user sessions. */
+export function AdminProtectedRoute() {
+  const isAuthenticated = useAppSelector((s) => s.admin.isAuthenticated)
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />
+  }
+
+  return <Outlet />
+}
+
+export function AdminPublicRoute() {
+  const isAuthenticated = useAppSelector((s) => s.admin.isAuthenticated)
+
+  if (isAuthenticated) {
+    return <Navigate to="/admin" replace />
+  }
+
+  return <Outlet />
+}

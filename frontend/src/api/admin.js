@@ -1,9 +1,18 @@
 import { apiRequest } from './client'
 
 export const adminApi = {
-  getCgroup: () => apiRequest('/cgroup', { auth: false }),
+  /** Verifies the admin key against a protected endpoint. */
+  verify: (apiKey) =>
+    apiRequest('/dbports', {
+      admin: false,
+      auth: false,
+      headers: { 'X-API-Key': apiKey },
+    }),
 
-  destroyCgroup: () => apiRequest('/cgroup', { method: 'DELETE', auth: false }),
+  getCgroup: () => apiRequest('/cgroup', { admin: true, auth: false }),
 
-  getPorts: () => apiRequest('/dbports', { auth: false }),
+  destroyCgroup: () =>
+    apiRequest('/cgroup', { method: 'DELETE', admin: true, auth: false }),
+
+  getPorts: () => apiRequest('/dbports', { admin: true, auth: false }),
 }

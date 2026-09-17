@@ -8,6 +8,7 @@ export const routes = {
   jobDetail: '/jobs/:id',
   settings: '/settings',
   admin: '/admin',
+  adminLogin: '/admin/login',
 }
 
 export const navItems = [
@@ -16,5 +17,4 @@ export const navItems = [
   { label: 'Deploy', path: routes.deploy, icon: 'deploy' },
   { label: 'Deploys', path: routes.jobs, icon: 'jobs' },
   { label: 'Settings', path: routes.settings, icon: 'settings' },
-  { label: 'System', path: routes.admin, icon: 'admin' },
 ]

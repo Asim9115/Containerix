@@ -1,6 +1,34 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import { adminApi, healthApi } from '../../api'
+import {
+  adminApi,
+  healthApi,
+  getStoredAdminApiKey,
+  setStoredAdminApiKey,
+} from '../../api'
 import { ensureArray } from '../../utils/array'
+
+function unauthorized(err, rejectWithValue) {
+  if (err.status === 401) {
+    setStoredAdminApiKey(null)
+    return rejectWithValue({ message: err.message, unauthorized: true })
+  }
+  return rejectWithValue({ message: err.message, unauthorized: false })
+}
+
+export const loginAdmin = createAsyncThunk(
+  'admin/login',
+  async (apiKey, { rejectWithValue }) => {
+    try {
+      const key = apiKey.trim()
+      await adminApi.verify(key)
+      setStoredAdminApiKey(key)
+      return key
+    } catch (err) {
+      setStoredAdminApiKey(null)
+      return rejectWithValue(err.message)
+    }
+  },
+)
 
 export const fetchCgroup = createAsyncThunk(
   'admin/fetchCgroup',
@@ -8,7 +36,7 @@ export const fetchCgroup = createAsyncThunk(
     try {
       return await adminApi.getCgroup()
     } catch (err) {
-      return rejectWithValue(err.message)
+      return unauthorized(err, rejectWithValue)
     }
   },
 )
@@ -19,7 +47,7 @@ export const destroyCgroup = createAsyncThunk(
     try {
       return await adminApi.destroyCgroup()
     } catch (err) {
-      return rejectWithValue(err.message)
+      return unauthorized(err, rejectWithValue)
     }
   },
 )
@@ -30,7 +58,7 @@ export const fetchPorts = createAsyncThunk(
     try {
       return await adminApi.getPorts()
     } catch (err) {
-      return rejectWithValue(err.message)
+      return unauthorized(err, rejectWithValue)
     }
   },
 )
@@ -50,24 +78,61 @@ export const fetchHealth = createAsyncThunk(
   },
 )
 
+function applyAuthError(state, payload) {
+  const message = typeof payload === 'string' ? payload : payload?.message
+  state.error = message || null
+  if (payload?.unauthorized) {
+    state.isAuthenticated = false
+    state.apiKey = null
+  }
+}
+
 const adminSlice = createSlice({
   name: 'admin',
   initialState: {
+    isAuthenticated: !!getStoredAdminApiKey(),
+    apiKey: getStoredAdminApiKey(),
     cgroup: null,
     ports: [],
     health: null,
     ready: null,
     loading: false,
+    authLoading: false,
     error: null,
     cgroupActionLoading: false,
   },
   reducers: {
+    logoutAdmin(state) {
+      setStoredAdminApiKey(null)
+      state.isAuthenticated = false
+      state.apiKey = null
+      state.cgroup = null
+      state.ports = []
+      state.health = null
+      state.ready = null
+      state.error = null
+    },
     clearAdminError(state) {
       state.error = null
     },
   },
   extraReducers: (builder) => {
     builder
+      .addCase(loginAdmin.pending, (state) => {
+        state.authLoading = true
+        state.error = null
+      })
+      .addCase(loginAdmin.fulfilled, (state, action) => {
+        state.authLoading = false
+        state.isAuthenticated = true
+        state.apiKey = action.payload
+      })
+      .addCase(loginAdmin.rejected, (state, action) => {
+        state.authLoading = false
+        state.isAuthenticated = false
+        state.apiKey = null
+        state.error = action.payload
+      })
       .addCase(fetchCgroup.pending, (state) => {
         state.loading = true
         state.error = null
@@ -78,7 +143,7 @@ const adminSlice = createSlice({
       })
       .addCase(fetchCgroup.rejected, (state, action) => {
         state.loading = false
-        state.error = action.payload
+        applyAuthError(state, action.payload)
       })
       .addCase(destroyCgroup.pending, (state) => {
         state.cgroupActionLoading = true
@@ -89,10 +154,13 @@ const adminSlice = createSlice({
       })
       .addCase(destroyCgroup.rejected, (state, action) => {
         state.cgroupActionLoading = false
-        state.error = action.payload
+        applyAuthError(state, action.payload)
       })
       .addCase(fetchPorts.fulfilled, (state, action) => {
         state.ports = ensureArray(action.payload)
+      })
+      .addCase(fetchPorts.rejected, (state, action) => {
+        applyAuthError(state, action.payload)
       })
       .addCase(fetchHealth.fulfilled, (state, action) => {
         state.health = action.payload.health
@@ -101,5 +169,5 @@ const adminSlice = createSlice({
   },
 })
 
-export const { clearAdminError } = adminSlice.actions
+export const { logoutAdmin, clearAdminError } = adminSlice.actions
 export default adminSlice.reducer

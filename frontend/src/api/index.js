@@ -5,4 +5,12 @@ export { deploymentsApi } from './deployments'
 export { containersApi } from './containers'
 export { adminApi } from './admin'
 export { healthApi } from './health'
-export { apiRequest, streamSSE, getStoredApiKey, setStoredApiKey, ApiError } from './client'
+export {
+  apiRequest,
+  streamSSE,
+  getStoredApiKey,
+  setStoredApiKey,
+  getStoredAdminApiKey,
+  setStoredAdminApiKey,
+  ApiError,
+} from './client'

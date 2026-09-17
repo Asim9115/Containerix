@@ -21,8 +21,20 @@ export function setStoredApiKey(key) {
   }
 }
 
+export function getStoredAdminApiKey() {
+  return localStorage.getItem(config.adminApiKeyStorageKey)
+}
+
+export function setStoredAdminApiKey(key) {
+  if (key) {
+    localStorage.setItem(config.adminApiKeyStorageKey, key)
+  } else {
+    localStorage.removeItem(config.adminApiKeyStorageKey)
+  }
+}
+
 export async function apiRequest(path, options = {}) {
-  const { auth = true, body, headers = {}, ...rest } = options
+  const { auth = true, admin = false, body, headers = {}, ...rest } = options
 
   const reqHeaders = { ...headers }
 
@@ -30,7 +42,13 @@ export async function apiRequest(path, options = {}) {
     reqHeaders['Content-Type'] = 'application/json'
   }
 
-  if (auth) {
+  if (admin) {
+    const apiKey = getStoredAdminApiKey()
+    if (!apiKey) {
+      throw new ApiError('Not authenticated as admin', 401)
+    }
+    reqHeaders['X-API-Key'] = apiKey
+  } else if (auth) {
     const apiKey = getStoredApiKey()
     if (!apiKey) {
       throw new ApiError('Not authenticated', 401)
