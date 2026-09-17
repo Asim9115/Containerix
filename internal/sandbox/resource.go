@@ -6,35 +6,55 @@ import (
 	"github.com/asim9115/containerix/internal/types"
 )
 
-func (s *SandboxManager)CanAllocate(cpuNeeded float64, memory string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	usedMemory, err := strconv.ParseInt(s.UsedMemory, 10, 64)
-	if err != nil {
-		return err
-	}
-	totalMemory, err := strconv.ParseInt(s.Memory, 10, 64)
-	if err != nil {
-		return err
-	}
+func (s *SandboxManager) Allocate(cpuNeeded float64, memory string,) error {
+    s.mu.Lock()
+    defer s.mu.Unlock()
 
-	memoryNeeded, err := strconv.ParseInt(memory, 10, 64)
-	if err != nil {
-		return err
-	}
+    usedMemory, err := strconv.ParseInt(s.UsedMemory, 10, 64)
+    if err != nil {
+        return err
+    }
 
-	cpuRemaining := s.Cpu - s.UsedCpu
+    totalMemory, err := strconv.ParseInt(s.Memory, 10, 64)
+    if err != nil {
+        return err
+    }
 
-	if cpuRemaining < cpuNeeded {
-		return fmt.Errorf("insufficient CPU: requested %f, available %f", cpuNeeded, cpuRemaining)
-	}
+    memoryNeeded, err := strconv.ParseInt(memory, 10, 64)
+    if err != nil {
+        return err
+    }
 
-	memoryAvailable := totalMemory - usedMemory
-	if memoryNeeded > memoryAvailable {
-		return fmt.Errorf("insufficient memory: requested %d bytes, available %d bytes", memoryNeeded, memoryAvailable)
-	}
+    // Check CPU availability.
+    cpuRemaining := s.Cpu - s.UsedCpu
 
-	return nil
+    if cpuRemaining < cpuNeeded {
+        return fmt.Errorf(
+            "insufficient CPU: requested %f, available %f",
+            cpuNeeded,
+            cpuRemaining,
+        )
+    }
+
+    // Check memory availability.
+    memoryAvailable := totalMemory - usedMemory
+
+    if memoryNeeded > memoryAvailable {
+        return fmt.Errorf(
+            "insufficient memory: requested %d bytes, available %d bytes",
+            memoryNeeded,
+            memoryAvailable,
+        )
+    }
+
+    // Allocate resources 
+    s.UsedCpu += cpuNeeded
+    s.UsedMemory = strconv.FormatInt(
+        usedMemory+memoryNeeded,
+        10,
+    )
+
+    return nil
 }
 
 func (s *SandboxManager) Release(cpu float64, memory string) error {
@@ -71,23 +91,24 @@ func (s *SandboxManager) Release(cpu float64, memory string) error {
 	return nil
 }
 
-func (s *SandboxManager) Allocate(cpu float64, memory string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	newCpu := s.UsedCpu + cpu
-	addMemory, err := strconv.Atoi(memory)
-	if err != nil {
-		return err
-	}
-	usedMemory, err := strconv.Atoi(s.UsedMemory)
-	if err != nil {
-		return err
-	}
-	newMemory := usedMemory + addMemory
-	s.UsedCpu = newCpu
-	s.UsedMemory = strconv.Itoa(newMemory)
-	return nil
-}
+// func (s *SandboxManager) Allocate(cpu float64, memory string) error {
+
+// 	newCpu := s.UsedCpu + cpu
+// 	addMemory, err := strconv.Atoi(memory)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	s.mu.Lock()
+// 	defer s.mu.Unlock()
+// 	usedMemory, err := strconv.Atoi(s.UsedMemory)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	newMemory := usedMemory + addMemory
+// 	s.UsedCpu = newCpu
+// 	s.UsedMemory = strconv.Itoa(newMemory)
+// 	return nil
+// }
 
 func (s *SandboxManager) Remaining() types.Stats {
 	return s.Stats()

@@ -54,11 +54,6 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 	emit("checking sandbox resources")
 	log.Print("checking sandbox resources")
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "checking sandbox resources")
-	err = state.SB.Sandbox.CanAllocate(cpu, memory)
-	if err != nil {
-		return handleFailure(err)
-	}
-
 	err = state.SB.Sandbox.Allocate(cpu, memory)
 	if err != nil {
 		return handleFailure(err)

@@ -8,7 +8,7 @@ import (
 const CgroupRoot = "/sys/fs/cgroup"
 
 type Sandbox interface {
-	CanAllocate(cpuNeeded float64, memory string) error
+	//CanAllocate(cpuNeeded float64, memory string) error
 	Allocate(cpu float64, memory string) error
 	Release(cpu float64, memory string) error
 	UpdateResources(cpu float64, memory string) error
