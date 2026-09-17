@@ -7,8 +7,9 @@ build:
 	go build -o $(BINARY) ./cmd/server
 
 ## run: build then run with sudo (required for cgroup access)
+## loads .env into the process via config; -E keeps any already-exported vars
 run: build
-	sudo ./$(BINARY)
+	sudo -E ./$(BINARY)
 
 ## deps: download all Go module dependencies
 deps:

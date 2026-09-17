@@ -16,8 +16,8 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 		middleware.MaxBody(cfg.MaxRequestBody),
 		middleware.GlobalRateLimit(cfg.GlobalRateLimit, cfg.GlobalRateWindow),
 		cors.New(cors.Config{
-			AllowAllOrigins: true,
-			AllowMethods:[]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowOrigins: cfg.CORSOrigins,
+			AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 			AllowHeaders: []string{"Content-Type", "X-API-Key", "Authorization"},
 		}),
 	)
@@ -56,14 +56,15 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 		protected.GET("/deployments", h.ListMyDeployments)
 		protected.GET("/deployments/:id", h.GetDeployment)
 		protected.DELETE("/deployments/:id", h.DeleteDeployment)
-
-		// Cgroup (admin)
-		
 	}
 
-	r.GET("/cgroup", h.GetCgroup)
-	r.DELETE("/cgroup", h.DeleteCgroup)
-	r.GET("/dbports", h.GetPorts)
+	admin := r.Group("/")
+	admin.Use(middleware.AdminAPIKeyAuth(cfg.AdminAPIKey))
+	{
+		admin.GET("/cgroup", h.GetCgroup)
+		admin.DELETE("/cgroup", h.DeleteCgroup)
+		admin.GET("/dbports", h.GetPorts)
+	}
 
 	r.GET("/health", h.Health)
 	r.GET("/ready", h.Ready)
