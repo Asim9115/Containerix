@@ -1,6 +1,5 @@
 annotated-doc==0.0.5
 annotated-types==0.8.0
-anthropic==1.2.0
 anyio==4.14.2
 click==8.5.0
 docstring_parser==0.18.0
@@ -10,6 +9,7 @@ httpcore2==2.12.0
 httpx2==2.12.0
 idna==3.19
 jiter==0.16.0
+openai==3.16.2
 pydantic==2.13.5
 pydantic_core==2.46.5
 python-dotenv==1.2.3
