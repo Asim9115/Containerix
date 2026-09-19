@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { fetchDeployments, deleteDeployment } from '../store/slices/deploymentsSlice'
+import {
+  fetchDeployments,
+  deleteDeployment,
+  clearDeploymentError,
+} from '../store/slices/deploymentsSlice'
 import { stopContainer, stopAllContainers } from '../store/slices/containersSlice'
 import { PageHeader, PageContent } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
@@ -14,6 +18,7 @@ export function ServicesPage() {
   const dispatch = useAppDispatch()
   const items = useAppSelector((s) => s.deployments.items) ?? []
   const loading = useAppSelector((s) => s.deployments.loading)
+  const error = useAppSelector((s) => s.deployments.error)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -26,9 +31,12 @@ export function ServicesPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     setActionLoading(true)
-    await dispatch(deleteDeployment(deleteTarget.ID))
+    dispatch(clearDeploymentError())
+    const result = await dispatch(deleteDeployment(deleteTarget.ID))
     setActionLoading(false)
-    setDeleteTarget(null)
+    if (deleteDeployment.fulfilled.match(result)) {
+      setDeleteTarget(null)
+    }
   }
 
   const handleStop = async (containerId) => {
@@ -63,6 +71,12 @@ export function ServicesPage() {
       />
 
       <PageContent>
+        {error && (
+          <p className="text-sm text-red-400 border border-red-900/50 bg-red-950/20 px-3 py-2 mb-4">
+            {error}
+          </p>
+        )}
+
         {items.length === 0 ? (
           <EmptyState
             title="No services"

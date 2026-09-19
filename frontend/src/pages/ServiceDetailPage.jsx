@@ -5,6 +5,7 @@ import {
   fetchDeployment,
   deleteDeployment,
   clearCurrentDeployment,
+  clearDeploymentError,
 } from '../store/slices/deploymentsSlice'
 import { stopContainer } from '../store/slices/containersSlice'
 import { PageHeader, PageContent } from '../components/layout/PageHeader'
@@ -27,6 +28,7 @@ export function ServiceDetailPage() {
   const dispatch = useAppDispatch()
   const service = useAppSelector((s) => s.deployments.current)
   const loading = useAppSelector((s) => s.deployments.loading)
+  const error = useAppSelector((s) => s.deployments.error)
   const [showDelete, setShowDelete] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -49,9 +51,13 @@ export function ServiceDetailPage() {
 
   const handleDelete = async () => {
     setActionLoading(true)
-    await dispatch(deleteDeployment(id))
+    dispatch(clearDeploymentError())
+    const result = await dispatch(deleteDeployment(id))
     setActionLoading(false)
-    navigate('/services')
+    if (deleteDeployment.fulfilled.match(result)) {
+      setShowDelete(false)
+      navigate('/services')
+    }
   }
 
   if (loading && !service) return <PageLoader />
@@ -93,6 +99,12 @@ export function ServiceDetailPage() {
       />
 
       <PageContent className="space-y-6">
+        {error && (
+          <p className="text-sm text-red-400 border border-red-900/50 bg-red-950/20 px-3 py-2">
+            {error}
+          </p>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-border border border-border">
           <InfoCell label="Status" value={<StatusBadge status={service.Status} />} />
           <InfoCell
