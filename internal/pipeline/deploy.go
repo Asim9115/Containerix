@@ -1,14 +1,19 @@
 package pipeline
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/asim9115/containerix/internal/builder"
 	"github.com/asim9115/containerix/internal/cgroup"
+	"github.com/asim9115/containerix/internal/config"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/repository"
@@ -67,7 +72,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 	}
 
 	emit("validating url : " + req.Url)
-		//----------------3. Validate url from url injection-------------
+	//----------------3. Validate url from url injection-------------
 
 	log.Printf("validating url : %s", req.Url)
 	_ = h.Repo.Jobs.UpdateStatus(jobId, types.JobBuilding, "validating")
@@ -90,15 +95,16 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 	}
 	defer os.RemoveAll(path)
 
-
-	//docker file and container 
+	//docker file and container
 	containerPort := req.Port
 	if containerPort <= 0 {
 		containerPort = types.DefaultAppPort
 	}
-	tag, err := builder.BuildDockerImage(logBus , req, path)
+	tag, err := builder.BuildDockerImage(logBus, req, path)
 	if err != nil {
 		cleanup()
+		//call agent and pass the logs
+
 		return handleFailure(fmt.Errorf("builder: %w", err))
 	}
 	//-----------------8. Check internal free port ----------------------
@@ -202,7 +208,7 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 		}
 	}
 	emit_event("deployed", appUrl)
-//------17. Return container id----------
+	//------17. Return container id----------
 	return cfg.Name, nil
 }
 
@@ -218,4 +224,49 @@ func mergePlatformEnv(containerPort int, user map[string]string) map[string]stri
 	out["PORT"] = strconv.Itoa(containerPort)
 	out["HOST"] = "0.0.0.0"
 	return out
+}
+
+func AgentTriage(jobId, Error, repoPath, repoUrl string, buildLog string) (*types.TriageResponse, error) {
+	agentUrl := config.Load().AgentURL
+	triageRequest := &types.TriageRequest{
+		JobId:    jobId,
+		Error:    Error,
+		RepoPath: repoPath,
+		RepoUrl:  repoUrl,
+		BuildLog: buildLog,
+	}
+	body, err := json.Marshal(triageRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal triage request: %w", err)
+	}
+
+	Response, err := http.Post(agentUrl+"/triage", "application/json", bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("failed to call agent: %w", err)
+
+	}
+	responseBody, err := io.ReadAll(Response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read agent response: %w", err)
+	}
+
+	//fmt.Printf("RAW AGENT RESPONSE: %s\n", string(responseBody))
+
+	defer Response.Body.Close()
+	if Response.StatusCode < 200 || Response.StatusCode >= 300 {
+		responseBody, _ := io.ReadAll(Response.Body)
+
+		return nil, fmt.Errorf(
+			"agent returned status: %s, body: %s",
+			Response.Status,
+			string(responseBody),
+		)
+		// return nil, fmt.Errorf("agent returned status: %s", Response.Status)
+	}
+
+	triageResponse := &types.TriageResponse{}
+	if err := json.Unmarshal(responseBody, &triageResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode agent response: %w", err)
+	}
+	return triageResponse, nil
 }

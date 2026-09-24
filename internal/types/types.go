@@ -24,8 +24,8 @@ type Stats struct {
 }
 
 type Config struct {
-	Name  string
-	Image string
+	Name    string
+	Image   string
 	Ports   []PortMapping
 	Env     map[string]string
 	Cmd     []string
@@ -118,6 +118,7 @@ type SSEEvent struct {
 	Event string
 	Data  string
 }
+
 const DefaultAppPort = 10000
 
 type Language string
@@ -147,3 +148,19 @@ type BuildRequest struct {
 	ResolvedTier    Tier              `json:"-"`
 }
 
+type TriageResponse struct {
+	JobId      string   `json:"job_id"`
+	RootCause  string   `json:"root_cause"`
+	Fix        string   `json:"fix"`
+	Confidence string   `json:"confidence"`
+	StepsTaken []string `json:"steps_taken"`
+	TurnsUsed  int      `json:"turns_used"`
+}
+
+type TriageRequest struct {
+	JobId    string   `json:"job_id"`
+	Error    string   `json:"error"`
+	RepoPath string   `json:"repo_path"`
+	RepoUrl  string   `json:"repo_url"`
+	BuildLog string   `json:"build_log"`
+}
