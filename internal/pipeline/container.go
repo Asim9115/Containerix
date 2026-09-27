@@ -119,3 +119,11 @@ func (h *State) StopAllContainers(userID string) ([]string, error) {
 	}
 	return stopped, nil
 }
+
+func (h *State) StartContainer(containerID string) error {
+	//handle streaming logs of container, ports, resources and db updation
+	//create steps from scratch like deploy or a function that can handle it which can be called in
+	//deploy as well as startcontainer 
+	//DRY dont repeat yourself
+	return nil
+}

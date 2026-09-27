@@ -1,10 +1,12 @@
 package container
 
 import (
+	"context"
 	"log"
 
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/types"
+	"github.com/moby/moby/client"
 )
 
 type ContainerManager interface {
@@ -94,3 +96,11 @@ func DeleteContainer(container *types.Container) error {
 	return nil
 }
 
+func GetContainer(ctx context.Context, cli *client.Client, containerID string) (client.ContainerInspectResult, bool, error) {
+	container, err := cli.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return client.ContainerInspectResult{}, false, err
+	}
+
+	return container, true, nil
+}

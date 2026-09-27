@@ -22,6 +22,7 @@ type Config struct {
 	GlobalRateWindow       time.Duration
 	RegistrationRateLimit  int
 	RegistrationRateWindow time.Duration
+	AgentURL			   string
 }
 
 func Load() *Config {
@@ -41,6 +42,7 @@ func Load() *Config {
 		GlobalRateWindow:       time.Duration(getEnvInt("CONTAINERIX_GLOBAL_RATE_WINDOW", 60)) * time.Second,
 		RegistrationRateLimit:  int(getEnvInt("CONTAINERIX_REGISTRATION_RATE_LIMIT", 5)),
 		RegistrationRateWindow: time.Duration(getEnvInt("CONTAINERIX_REGISTRATION_RATE_WINDOW", 3600)) * time.Second,
+		AgentURL: getEnv("AGENT_TRIAGE_URL", "http://localhost:8001"),
 	}
 }
 
