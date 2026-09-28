@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/asim9115/containerix/internal/container"
@@ -148,5 +149,14 @@ func (h *GlobalState) StartContainer(c *gin.Context) {
 		return
 	}
 
-	h.Pipeline.StartContainer(data.ContainerID)
+	cfg, err := h.Pipeline.StartContainer(data)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error":"failed to start container"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"url":     fmt.Sprintf("http://localhost:%d", cfg.Ports[0].HostPort),
+	})
 }

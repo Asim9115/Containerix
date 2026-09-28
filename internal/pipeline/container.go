@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
 	"github.com/asim9115/containerix/internal/repository"
@@ -89,14 +90,10 @@ func (h *State) StopContainer(container repository.Deployment) error {
 		return err
 	}
 	state.SB.Sandbox.RemoveContainer(container.ContainerID)
-	if container.HostPort > 0 {
-		if err := h.Repo.Ports.FreePort(container.HostPort); err != nil {
-			log.Printf("[stopcontainer] failed to free port %d in db: %v", container.HostPort, err)
-		}
-		state.SB.Ports.MarkFree(container.HostPort)
-	}
 
-	if err := h.Repo.Deployments.UpdateStatusAndPort(container.ContainerID, types.DeployStopped, 0); err != nil {
+	// Docker retains the host port mapping while the container is stopped, so
+	// keep that port reserved for this deployment until it is deleted.
+	if err := h.Repo.Deployments.UpdateStatusAndPort(container.ContainerID, types.DeployStopped, container.HostPort); err != nil {
 		return err
 	}
 	return nil
@@ -120,10 +117,60 @@ func (h *State) StopAllContainers(userID string) ([]string, error) {
 	return stopped, nil
 }
 
-func (h *State) StartContainer(containerID string) error {
-	//handle streaming logs of container, ports, resources and db updation
-	//create steps from scratch like deploy or a function that can handle it which can be called in
-	//deploy as well as startcontainer 
-	//DRY dont repeat yourself
-	return nil
+func (h *State) StartContainer(deployment repository.Deployment) (*types.Config, error) {
+	cpu := deployment.TierCPU
+	memory, err := types.MemoryToBytes(deployment.TierMemory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse deployment memory: %w", err)
+	}
+	if deployment.ContainerID == "" || deployment.HostPort <= 0 {
+		return nil, fmt.Errorf("deployment is missing its container ID or host port")
+	}
+	cfg := &types.Config{
+		Name: deployment.ContainerID,
+		Tier: types.Tier{Name: deployment.TierName, Cpu: cpu, Memory: deployment.TierMemory},
+		Ports: []types.PortMapping{{
+			HostPort:      deployment.HostPort,
+			ContainerPort: deployment.ContainerPort,
+		}},
+	}
+
+	if err := state.SB.Sandbox.Allocate(cpu, memory); err != nil {
+		return nil, fmt.Errorf("not enough resources: %w", err)
+	}
+	allocated := true
+	defer func() {
+		if allocated {
+			_ = state.SB.Sandbox.Release(cpu, memory)
+		}
+	}()
+
+	if err := container.Start(deployment.ContainerID); err != nil {
+		return nil, fmt.Errorf("failed to start container: %w", err)
+	}
+
+	pid, err := docker.GetPid(deployment.ContainerID)
+	if err != nil {
+		_ = docker.StopContainer(deployment.ContainerID)
+		return nil, fmt.Errorf("failed to get container pid: %w", err)
+	}
+	if err := cgroup.AddProcess(state.SB.Sandbox.GetState().Name, pid); err != nil {
+		_ = docker.StopContainer(deployment.ContainerID)
+		return nil, fmt.Errorf("failed to add process to sandbox: %w", err)
+	}
+
+	state.SB.Sandbox.AddContainer(&types.Container{
+		ID:     deployment.ContainerID,
+		CPU:    cpu,
+		Memory: deployment.TierMemory,
+		Status: types.DeployRunning,
+	})
+	if err := h.Repo.Deployments.UpdateStatusAndPort(deployment.ContainerID, types.DeployRunning, deployment.HostPort); err != nil {
+		_ = docker.StopContainer(deployment.ContainerID)
+		state.SB.Sandbox.RemoveContainer(deployment.ContainerID)
+		return nil, fmt.Errorf("failed to update deployment status: %w", err)
+	}
+
+	allocated = false
+	return cfg, nil
 }

@@ -61,12 +61,25 @@ func (h *State) SyncData() *Data {
 		log.Printf("[sync] error getting containers from database: %v", err)
 		return nil
 	}
+	allDeployments, err := repos.Deployments.GetAll()
+	if err != nil {
+		log.Printf("[sync] error getting deployments for port reconciliation: %v", err)
+		return nil
+	}
+	knownContainers := make(map[string]bool, len(allDeployments))
+	for _, deployment := range allDeployments {
+		if deployment.ContainerID != "" {
+			knownContainers[deployment.ContainerID] = true
+		}
+	}
 
 	//4. map database containers ID
 	dbContainersMap := make(map[string]bool)
+	dbContainerPorts := make(map[string]int)
 	for _, dbContainer := range dbContainers {
 		if dbContainer.ContainerID != "" {
 			dbContainersMap[dbContainer.ContainerID] = true
+			dbContainerPorts[dbContainer.ContainerID] = dbContainer.HostPort
 		}
 	}
 	//5. reconcile host -> database
@@ -85,12 +98,8 @@ func (h *State) SyncData() *Data {
 	for dbContainer := range dbContainersMap {
 		if !hostContainersIDMap[dbContainer] {
 			log.Printf("[Sync] Updating out-of-sync DB container to stopped: %s", dbContainer)
-			if err := repos.Deployments.UpdateStatusAndPort(dbContainer, types.DeployStopped, 0); err != nil {
+			if err := repos.Deployments.UpdateStatusAndPort(dbContainer, types.DeployStopped, dbContainerPorts[dbContainer]); err != nil {
 				log.Printf("[Sync] Failed to update deployment status for %s: %v", dbContainer, err)
-			}
-			// add free port and update the db container
-			if err := repos.Ports.DeleteByContainerID(dbContainer); err != nil {
-				log.Printf("[sync] Failed to delete port in db : %v", err)
 			}
 		}
 	}
@@ -100,8 +109,7 @@ func (h *State) SyncData() *Data {
 	//   a) Missing row  — the server crashed between MarkAsUsed and Ports.Create during a deploy.
 	//      The container is alive on the host but has no port_allocations row, so after a restart
 	//      the in-memory port manager won't know that port is taken → double allocation on next deploy.
-	//   b) Stale row — a container stopped (handled in step 6) but Ports.DeleteByContainerID failed
-	//      silently in a previous run, leaving a ghost row that permanently blocks the port.
+	//   b) Stale row — a deployment was deleted but its port row was left behind.
 	existingPorts, portErr := repos.Ports.GetAll()
 	if portErr != nil {
 		log.Printf("[sync] could not fetch port_allocations for reconcile: %v", portErr)
@@ -112,12 +120,9 @@ func (h *State) SyncData() *Data {
 			allocatedInDB[p.HostPort] = true
 		}
 
-		for _, c := range dbContainers {
-			if !hostContainersIDMap[c.ContainerID] {
-				continue // step 6 already dealt with this container
-			}
+		for _, c := range allDeployments {
 			if c.HostPort > 0 && !allocatedInDB[c.HostPort] {
-				// Scenario (a): running container has no port_allocations row — re-insert it.
+				// Restore reservations for running and stopped containers.
 				log.Printf("[sync] re-inserting missing port allocation: host=%d container=%s", c.HostPort, c.ContainerID)
 				if err := repos.Ports.Create(&repository.Ports{
 					HostPort:      c.HostPort,
@@ -129,9 +134,9 @@ func (h *State) SyncData() *Data {
 			}
 		}
 
-		// Scenario (b): stale port_allocations rows whose container is no longer running.
+		// Scenario (b): stale rows for containers whose deployment was deleted.
 		for _, p := range existingPorts {
-			if !hostContainersIDMap[p.ContainerID] {
+			if !knownContainers[p.ContainerID] {
 				log.Printf("[sync] removing stale port allocation: host=%d container=%s", p.HostPort, p.ContainerID)
 				if err := repos.Ports.DeleteByContainerID(p.ContainerID); err != nil {
 					log.Printf("[sync] failed to remove stale port %d: %v", p.HostPort, err)
@@ -147,6 +152,17 @@ func (h *State) SyncData() *Data {
 	// race against those writes and could return stale data depending on DB timing.
 	data := &Data{
 		Ports: make(map[int]string),
+	}
+	// A stopped Docker container keeps its configured port mapping. Restore
+	// those reservations too, so a new deployment cannot claim the same port.
+	if existingPorts, err := repos.Ports.GetAll(); err == nil {
+		for _, p := range existingPorts {
+			if knownContainers[p.ContainerID] {
+				data.Ports[p.HostPort] = p.ContainerID
+			}
+		}
+	} else {
+		log.Printf("[sync] could not restore port reservations: %v", err)
 	}
 	var totalMemory int
 	for _, c := range dbContainers {
@@ -179,4 +195,3 @@ func (h *State) SyncData() *Data {
 	log.Printf("[sync] sandbox data to sync: %+v", data)
 	return data
 }
-
