@@ -44,6 +44,10 @@ func (h *State) DeleteContainer(containerID string) error {
 		})
 		if err != nil {
 			log.Printf("[deletecontainer] error deleting container: %v", err)
+		} else if Container.ImageTag != "" {
+			if err := docker.DeleteImage(Container.ImageTag); err != nil {
+				log.Printf("[deletecontainer] failed to delete image %s: %v", Container.ImageTag, err)
+			}
 		}
 	}
 	//---------------. Free resources----------------------

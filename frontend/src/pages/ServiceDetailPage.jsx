@@ -7,7 +7,7 @@ import {
   clearCurrentDeployment,
   clearDeploymentError,
 } from '../store/slices/deploymentsSlice'
-import { stopContainer } from '../store/slices/containersSlice'
+import { startContainer, stopContainer } from '../store/slices/containersSlice'
 import { PageHeader, PageContent } from '../components/layout/PageHeader'
 import { Card } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/Badge'
@@ -31,6 +31,7 @@ export function ServiceDetailPage() {
   const error = useAppSelector((s) => s.deployments.error)
   const [showDelete, setShowDelete] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
   useEffect(() => {
     dispatch(fetchDeployment(id))
@@ -44,8 +45,26 @@ export function ServiceDetailPage() {
   const handleStop = async () => {
     if (!service?.ContainerID) return
     setActionLoading(true)
-    await dispatch(stopContainer(service.ContainerID))
-    dispatch(fetchDeployment(id))
+    setActionError(null)
+    const result = await dispatch(stopContainer(service.ContainerID))
+    if (stopContainer.fulfilled.match(result)) {
+      dispatch(fetchDeployment(id))
+    } else {
+      setActionError(result.payload || 'Failed to suspend service')
+    }
+    setActionLoading(false)
+  }
+
+  const handleStart = async () => {
+    if (!service?.ID) return
+    setActionLoading(true)
+    setActionError(null)
+    const result = await dispatch(startContainer(service.ID))
+    if (startContainer.fulfilled.match(result)) {
+      dispatch(fetchDeployment(id))
+    } else {
+      setActionError(result.payload || 'Failed to start service')
+    }
     setActionLoading(false)
   }
 
@@ -91,6 +110,11 @@ export function ServiceDetailPage() {
                 Suspend
               </Button>
             )}
+            {service.Status === 'stopped' && service.ContainerID && (
+              <Button variant="secondary" size="sm" onClick={handleStart} loading={actionLoading}>
+                Start
+              </Button>
+            )}
             <Button variant="danger" size="sm" onClick={() => setShowDelete(true)}>
               Delete
             </Button>
@@ -99,9 +123,9 @@ export function ServiceDetailPage() {
       />
 
       <PageContent className="space-y-6">
-        {error && (
+        {(actionError || error) && (
           <p className="text-sm text-red-400 border border-red-900/50 bg-red-950/20 px-3 py-2">
-            {error}
+            {actionError || error}
           </p>
         )}
 

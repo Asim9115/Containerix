@@ -43,6 +43,7 @@ func NewRouter(repos *repository.Repos, p *pipeline.State, cfg *config.Config) *
 		protected.GET("/containers/:id", h.GetContainer)
 
 		protected.DELETE("/containers/:id", h.DeleteContainer)
+		protected.POST("/containers/:id/start", h.StartContainer)
 		protected.GET("/containers/:id/logs", h.StreamLogs)
 		protected.POST("/containers/:id/stop", h.StopContainer)
 		protected.POST("/containers/stop-all", h.StopAllContainers)

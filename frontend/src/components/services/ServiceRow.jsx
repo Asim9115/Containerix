@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { StatusBadge } from '../ui/Badge'
 import { getRepoName, formatRelativeTime, getServiceUrl } from '../../utils/format'
 
-export function ServiceRow({ service, showActions, onStop, onDelete }) {
+export function ServiceRow({ service, showActions, actionLoading, onStart, onStop, onDelete }) {
   return (
     <div className="flex items-center gap-4 px-4 py-3 border-b border-border last:border-b-0 hover:bg-surface-hover transition-colors group">
       <Link to={`/services/${service.ID}`} className="flex items-center gap-3 min-w-0 flex-1">
@@ -48,13 +48,24 @@ export function ServiceRow({ service, showActions, onStop, onDelete }) {
           {service.Status === 'running' && service.ContainerID && (
             <button
               onClick={() => onStop?.(service.ContainerID)}
-              className="text-xs text-fg-secondary hover:text-fg transition-colors"
+              disabled={actionLoading}
+              className="text-xs text-fg-secondary hover:text-fg transition-colors disabled:opacity-50"
             >
               Suspend
             </button>
           )}
+          {service.Status === 'stopped' && service.ContainerID && (
+            <button
+              onClick={() => onStart?.(service.ID)}
+              disabled={actionLoading}
+              className="text-xs text-fg-secondary hover:text-fg transition-colors disabled:opacity-50"
+            >
+              Start
+            </button>
+          )}
           <button
             onClick={() => onDelete?.(service)}
+            disabled={actionLoading}
             className="text-xs text-red-400/80 hover:text-red-400 transition-colors"
           >
             Delete

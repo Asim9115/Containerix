@@ -179,7 +179,6 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 		return handleFailure(err)
 	}
 	log.Printf("container pid: %d", pid)
-	_ = docker.DeleteImage(tag)
 	//------------13. Add pid to cgroup procs-------------------
 
 	if err := cgroup.AddProcess(state.SB.Sandbox.GetState().Name, pid); err != nil {

@@ -6,7 +6,7 @@ import {
   deleteDeployment,
   clearDeploymentError,
 } from '../store/slices/deploymentsSlice'
-import { stopContainer, stopAllContainers } from '../store/slices/containersSlice'
+import { startContainer, stopContainer, stopAllContainers } from '../store/slices/containersSlice'
 import { PageHeader, PageContent } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { ConfirmModal } from '../components/ui/Modal'
@@ -21,6 +21,7 @@ export function ServicesPage() {
   const error = useAppSelector((s) => s.deployments.error)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState(null)
 
   useEffect(() => {
     dispatch(fetchDeployments())
@@ -40,13 +41,39 @@ export function ServicesPage() {
   }
 
   const handleStop = async (containerId) => {
-    await dispatch(stopContainer(containerId))
-    dispatch(fetchDeployments())
+    setActionLoading(true)
+    setActionError(null)
+    const result = await dispatch(stopContainer(containerId))
+    if (stopContainer.fulfilled.match(result)) {
+      dispatch(fetchDeployments())
+    } else {
+      setActionError(result.payload || 'Failed to stop service')
+    }
+    setActionLoading(false)
+  }
+
+  const handleStart = async (deploymentId) => {
+    setActionLoading(true)
+    setActionError(null)
+    const result = await dispatch(startContainer(deploymentId))
+    if (startContainer.fulfilled.match(result)) {
+      dispatch(fetchDeployments())
+    } else {
+      setActionError(result.payload || 'Failed to start service')
+    }
+    setActionLoading(false)
   }
 
   const handleStopAll = async () => {
-    await dispatch(stopAllContainers())
-    dispatch(fetchDeployments())
+    setActionLoading(true)
+    setActionError(null)
+    const result = await dispatch(stopAllContainers())
+    if (stopAllContainers.fulfilled.match(result)) {
+      dispatch(fetchDeployments())
+    } else {
+      setActionError(result.payload || 'Failed to suspend services')
+    }
+    setActionLoading(false)
   }
 
   if (loading && items.length === 0) return <PageLoader />
@@ -59,7 +86,7 @@ export function ServicesPage() {
         actions={
           <div className="flex items-center gap-2">
             {items.some((s) => s.Status === 'running') && (
-              <Button variant="secondary" size="sm" onClick={handleStopAll}>
+              <Button variant="secondary" size="sm" onClick={handleStopAll} loading={actionLoading}>
                 Suspend all
               </Button>
             )}
@@ -71,9 +98,9 @@ export function ServicesPage() {
       />
 
       <PageContent>
-        {error && (
+        {(actionError || error) && (
           <p className="text-sm text-red-400 border border-red-900/50 bg-red-950/20 px-3 py-2 mb-4">
-            {error}
+            {actionError || error}
           </p>
         )}
 
@@ -95,6 +122,8 @@ export function ServicesPage() {
                 key={service.ID}
                 service={service}
                 showActions
+                actionLoading={actionLoading}
+                onStart={handleStart}
                 onStop={handleStop}
                 onDelete={setDeleteTarget}
               />

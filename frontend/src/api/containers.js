@@ -7,6 +7,8 @@ export const containersApi = {
 
   delete: (id) => apiRequest(`/containers/${id}`, { method: 'DELETE' }),
 
+  start: (deploymentId) => apiRequest(`/containers/${deploymentId}/start`, { method: 'POST' }),
+
   stop: (id) => apiRequest(`/containers/${id}/stop`, { method: 'POST' }),
 
   stopAll: () => apiRequest('/containers/stop-all', { method: 'POST' }),

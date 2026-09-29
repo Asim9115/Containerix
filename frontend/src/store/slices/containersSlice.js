@@ -36,6 +36,17 @@ export const stopContainer = createAsyncThunk(
   },
 )
 
+export const startContainer = createAsyncThunk(
+  'containers/start',
+  async (deploymentId, { rejectWithValue }) => {
+    try {
+      return await containersApi.start(deploymentId)
+    } catch (err) {
+      return rejectWithValue(err.message)
+    }
+  },
+)
+
 export const stopAllContainers = createAsyncThunk(
   'containers/stopAll',
   async (_, { rejectWithValue }) => {

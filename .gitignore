@@ -35,4 +35,6 @@ NOTES.md
 temp/
 venv/
 *.md
+V1_DEPLOYMENT_READINESS_REVIEW.md
+V1_CODE_BUG_AUDIT.md
 data/
