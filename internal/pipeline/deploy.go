@@ -16,6 +16,7 @@ import (
 	"github.com/asim9115/containerix/internal/config"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/proxy"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
@@ -199,7 +200,12 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 		log.Printf("[pipeline] error updating status in DB: %v", err)
 	}
 	//-------------16. Container Url-------------------
-	appUrl := fmt.Sprintf("http://localhost:%d", hostPort)
+	Url := fmt.Sprintf("http://localhost:%d", hostPort)
+	appUrl, err := AddRoute(jobId, Url)
+	if err != nil {
+		cleanupWithContainer()
+		return handleFailure(err)
+	}
 	emit_event := func(event, data string) {
 		select {
 		case logBus.Ch <- types.SSEEvent{Event: event, Data: data}:
@@ -268,4 +274,13 @@ func AgentTriage(jobId, Error, repoPath, repoUrl string, buildLog string) (*type
 		return nil, fmt.Errorf("failed to decode agent response: %w", err)
 	}
 	return triageResponse, nil
+}
+
+func AddRoute(name, url string) (string, error) {
+	//add checks 
+	domain := name[:4]+"."+config.Load().PublicDomain
+	if err := proxy.AddRoute(domain, url); err!=nil {
+		return "", err
+	}
+	return domain, nil
 }

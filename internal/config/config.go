@@ -24,6 +24,7 @@ type Config struct {
 	RegistrationRateWindow time.Duration
 	AgentURL			   string
 	CaddyPath			   string
+	PublicDomain		   string
 }
 
 func Load() *Config {
@@ -44,7 +45,8 @@ func Load() *Config {
 		RegistrationRateLimit:  int(getEnvInt("CONTAINERIX_REGISTRATION_RATE_LIMIT", 5)),
 		RegistrationRateWindow: time.Duration(getEnvInt("CONTAINERIX_REGISTRATION_RATE_WINDOW", 3600)) * time.Second,
 		AgentURL: getEnv("AGENT_TRIAGE_URL", "http://localhost:8001"),
-		CaddyPath: getEnv("CADDY_PATH", "./etc/caddy"),
+		CaddyPath: getEnv("CADDY_PATH", "/etc/caddy"),
+		PublicDomain: getEnv("CONTAINERIX_PUBLIC_DOMAIN", "cede-103-147-239-78.ngrok-free.app"),
 	}
 }
 

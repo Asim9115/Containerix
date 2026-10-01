@@ -44,7 +44,7 @@ func AddRoute(domain, upstream string) error {
 
 func Reload() error {
 	caddyfile := filepath.Join(
-		config.Load().CaddyPath, "caddyfile",
+		config.Load().CaddyPath, "Caddyfile",
 	)
 
 	validate := exec.Command("caddy", "validate", "--config", caddyfile)
