@@ -10,7 +10,7 @@ import (
 )
 
 func AddRoute(domain, upstream string) error {
-	data := fmt.Sprintf(`%s {
+	data := fmt.Sprintf(`http://%s {
 	reverse_proxy %s
 	}`, domain, upstream)
 	caddyPath := config.Load().CaddyPath
