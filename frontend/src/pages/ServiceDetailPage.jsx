@@ -134,14 +134,14 @@ export function ServiceDetailPage() {
           <InfoCell
             label="URL"
             value={
-              service.HostPort ? (
+              getServiceUrl(service) ? (
                 <a
-                  href={getServiceUrl(service.HostPort)}
+                  href={getServiceUrl(service)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-fg-secondary hover:text-fg hover:underline underline-offset-2"
                 >
-                  {getServiceUrl(service.HostPort)}
+                  {getServiceUrl(service)}
                 </a>
               ) : (
                 '—'

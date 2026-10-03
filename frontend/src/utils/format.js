@@ -25,9 +25,21 @@ export function getRepoName(url) {
   }
 }
 
-export function getServiceUrl(hostPort) {
-  if (!hostPort) return null
-  return `http://localhost:${hostPort}`
+export function getServiceUrl(serviceOrPort) {
+  if (!serviceOrPort) return null
+  if (typeof serviceOrPort === 'object') {
+    const rawUrl = serviceOrPort.LiveUrl || serviceOrPort.live_url
+    if (rawUrl) {
+      return rawUrl.startsWith('http://') || rawUrl.startsWith('https://')
+        ? rawUrl
+        : `http://${rawUrl}`
+    }
+    if (serviceOrPort.HostPort) {
+      return `http://localhost:${serviceOrPort.HostPort}`
+    }
+    return null
+  }
+  return `http://localhost:${serviceOrPort}`
 }
 
 export function parseEnvJson(envJson) {

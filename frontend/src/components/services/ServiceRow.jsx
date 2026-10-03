@@ -23,16 +23,16 @@ export function ServiceRow({ service, showActions, actionLoading, onStart, onSto
         <StatusBadge status={service.Status} />
       </div>
 
-      <div className="hidden md:block w-32 shrink-0 text-xs text-muted">
-        {service.HostPort ? (
+      <div className="hidden md:block w-36 shrink-0 text-xs text-muted truncate">
+        {getServiceUrl(service) ? (
           <a
-            href={getServiceUrl(service.HostPort)}
+            href={getServiceUrl(service)}
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-fg transition-colors"
+            className="hover:text-fg transition-colors truncate"
             onClick={(e) => e.stopPropagation()}
           >
-            :{service.HostPort}
+            {service.LiveUrl || service.live_url || `:${service.HostPort}`}
           </a>
         ) : (
           '—'
