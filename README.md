@@ -14,7 +14,7 @@ Containerix is a self-hosted PaaS engine built from scratch in Go. Give it a Git
 
 Think Railway or Render, but something you own and run yourself.
 
-**Status:** Core pipeline is functional end-to-end — user registration, API key auth, async deploy pipeline, cgroup v2 isolation, SSE log streaming, and startup reconciliation are all working. Custom domain routing and webhook-triggered redeploys are next.
+**Status:** Core pipeline is functional end-to-end — user registration, API key auth, async deploy pipeline, cgroup v2 isolation, SSE log streaming, startup reconciliation, and Caddy-based deployment routing are implemented. Custom domains and webhook-triggered redeploys are next.
 
 ---
 
@@ -23,6 +23,7 @@ Think Railway or Render, but something you own and run yourself.
 | Feature | Detail |
 |---|---|
 | 🚀 **Async one-request deploys** | `POST /build` returns `202 Accepted` immediately with a `job_id`; the full pipeline runs in a background goroutine |
+| 🌐 **Caddy ingress** | Creates a reverse-proxy route for each deployment hostname and reloads Caddy; routes are removed when deployments are deleted |
 | 🔑 **API key authentication** | Every user gets a `ctx-` prefixed API key on registration; keys are SHA-256 hashed before storage, never stored raw |
 | 🔑 **API key rotation** | `POST /users/api-key` invalidates the old key and issues a new one atomically |
 | 🔒 **cgroup v2 resource isolation** | Each sandbox gets a named cgroup under `/sys/fs/cgroup/`; every container's PID is pinned to it after launch, enforcing CPU quota and memory hard limits at kernel level |
@@ -64,9 +65,10 @@ Gin Router  →  APIKeyAuth middleware  →  CreateDockerImage handler
                         no-new-privileges, CAP_DROP=ALL)            │
          9. docker inspect → get container PID                      │
         10. Write PID to /sys/fs/cgroup/<name>/cgroup.procs         │
-        11. Update DB record  (status: running)                     │
-        12. Emit SSE "deployed" event  →  live URL                  │
-        13. Delete build image                                       │
+        11. Create Caddy route → deployment hostname                │
+        12. Update DB record  (status: running)                     │
+        13. Emit SSE "deployed" event  →  live URL                  │
+        14. Delete build image                                       │
                                                                     │
     ┌───────────────┬───────────────────────────────────────────────┘
     ▼               ▼
@@ -156,6 +158,7 @@ Containerix uses **Linux cgroup v2** (the unified hierarchy), writing directly t
 |---|---|---|
 | [Go](https://go.dev/dl/) | 1.21+ | Tested on 1.26 |
 | [Docker](https://docs.docker.com/get-docker/) | 20.10+ | Daemon must be running |
+| [Caddy](https://caddyserver.com/docs/install) | Current | Required for deployment host routing; the server must be able to write its route snippets and reload Caddy |
 | [Git](https://git-scm.com/) | Any | Used to clone target repos |
 | GCC / CGO | Any | `sudo apt install gcc` — required to compile `go-sqlite3` |
 | Linux (cgroup v2) | Kernel 5.2+ | Required for cgroup v2; run with `sudo` for `/sys/fs/cgroup` access |
@@ -177,9 +180,27 @@ cd containerix
 cp .env.example .env
 ```
 
-All config is via environment variables (see [Configuration](#configuration) below). The defaults work out of the box for local development.
+All config is via environment variables (see [Configuration](#configuration) below). Configure Caddy before deploying so Containerix can install each app's route.
 
-### 3. Install Go Dependencies
+### 3. Configure Caddy ingress
+
+Containerix uses Caddy to route each deployment hostname to its allocated local container port. Configure Caddy to import generated route snippets, then set `CADDY_PATH` and `CONTAINERIX_PUBLIC_DOMAIN` in `.env`. For example, with Caddy installed at `/etc/caddy`:
+
+```caddyfile
+{
+	auto_https off
+}
+
+import /etc/caddy/containerix/*.caddy
+
+:80 {
+	respond "Caddy is working"
+}
+```
+
+The hostname is built from the first four characters of the deployment job ID and `CONTAINERIX_PUBLIC_DOMAIN`. Point matching DNS hostnames to this server or configure a tunnel to forward them to Caddy. For the full Caddy and Cloudflare Tunnel walkthrough, see [Caddy and Cloudflare Tunnel setup](docs/CADDY_CLOUDFLARE_SETUP.md). Caddy must be installed and reloadable by the Containerix server for deployments to complete.
+
+### 4. Install Go Dependencies
 
 ```bash
 go mod download
@@ -187,7 +208,7 @@ go mod download
 
 > `go-sqlite3` uses CGO. Make sure `gcc` is installed: `sudo apt install gcc`
 
-### 4. Build
+### 5. Build
 
 ```bash
 make build
@@ -195,7 +216,7 @@ make build
 go build -o server ./cmd/server
 ```
 
-### 5. Run (root required for cgroup v2)
+### 6. Run (root required for cgroup v2)
 
 ```bash
 sudo ./server
@@ -423,6 +444,8 @@ All configuration is via environment variables. Every variable has a sensible de
 | `CONTAINERIX_GLOBAL_RATE_WINDOW` | `60` | Global rate limit window in seconds |
 | `CONTAINERIX_REGISTRATION_RATE_LIMIT` | `5` | Max registration attempts per IP per window |
 | `CONTAINERIX_REGISTRATION_RATE_WINDOW` | `3600` | Registration rate limit window in seconds |
+| `CADDY_PATH` | `/etc/caddy` | Directory containing the active `Caddyfile`; Containerix writes generated routes under `containerix/` and reloads this config |
+| `CONTAINERIX_PUBLIC_DOMAIN` | `asimkhan.me` | Base domain for generated deployment hostnames; configure DNS or a tunnel to route these hosts to Caddy |
 
 ---
 
@@ -600,7 +623,7 @@ make clean    # remove binary + tmp/
 ## Roadmap
 
 - [ ] Git webhook auto-redeploy on `git push` to `main`
-- [ ] Custom domain routing via reverse proxy (Caddy)
+- [ ] Custom domains (generated deployment subdomains are routed through Caddy)
 - [ ] PostgreSQL backend (repository interfaces already designed for it)
 - [ ] Readiness probe (currently a fixed 5 s sleep — `internal/readiness` is written, pending re-wire)
 - [ ] Admin API (view all users, all containers, sandbox stats)
