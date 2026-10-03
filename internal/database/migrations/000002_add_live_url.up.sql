@@ -1,0 +1,1 @@
+ALTER TABLE deployments ADD column live_url TEXT DEFAULT '';

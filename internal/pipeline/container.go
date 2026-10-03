@@ -7,6 +7,7 @@ import (
 	"github.com/asim9115/containerix/internal/cgroup"
 	"github.com/asim9115/containerix/internal/container"
 	"github.com/asim9115/containerix/internal/docker"
+	"github.com/asim9115/containerix/internal/proxy"
 	"github.com/asim9115/containerix/internal/repository"
 	"github.com/asim9115/containerix/internal/state"
 	"github.com/asim9115/containerix/internal/types"
@@ -48,6 +49,11 @@ func (h *State) DeleteContainer(containerID string) error {
 			if err := docker.DeleteImage(Container.ImageTag); err != nil {
 				log.Printf("[deletecontainer] failed to delete image %s: %v", Container.ImageTag, err)
 			}
+		}
+	}
+	if Container.LiveUrl != "" {
+		if err := proxy.RemoveRoute(Container.LiveUrl); err != nil {
+			log.Printf("[deletecontainer] warning - failed to remove proxy route %s: %v", Container.LiveUrl, err)
 		}
 	}
 	//---------------. Free resources----------------------

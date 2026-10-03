@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS port_allocations;
+DROP TABLE IF EXISTS jobs;
+DROP TABLE IF EXISTS deployments;
+DROP TABLE IF EXISTS users;

@@ -30,11 +30,12 @@ func (r *DeploymentRepo) GetByID(id string) (*repository.Deployment, error) {
 		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
 		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
 		        tier_name, COALESCE(tier_cpu, 0.0), COALESCE(tier_memory, ''),
-		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at
+		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at,
+		        COALESCE(live_url, '')
          FROM deployments WHERE id = ?`, id,
 	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
 		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
-		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt)
+		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt, &d.LiveUrl)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -44,10 +45,10 @@ func (r *DeploymentRepo) GetByID(id string) (*repository.Deployment, error) {
 	return d, nil
 }
 
-func (r *DeploymentRepo) UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int) error {
+func (r *DeploymentRepo) UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int, liveUrl string) error {
 	_, err := r.db.Exec(
-		`UPDATE deployments SET status=?, container_id=?, image_tag=?, host_port=?, container_port=?, updated_at=?
-		WHERE id=?`, status, containerID, imageTag, hostPort, containerPort, time.Now(), id,
+		`UPDATE deployments SET status=?, container_id=?, image_tag=?, host_port=?, container_port=?, updated_at=?, live_url=?
+		WHERE id=?`, status, containerID, imageTag, hostPort, containerPort, time.Now(), liveUrl, id,
 	)
 	return err
 }
@@ -68,7 +69,8 @@ func (r *DeploymentRepo) ListByUser(userID string) ([]repository.Deployment, err
 			COALESCE(env_json, '{}'),
 			COALESCE(error, ''),
 			created_at,
-			updated_at
+			updated_at,
+			COALESCE(live_url, '')
 		FROM deployments
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -97,6 +99,7 @@ func (r *DeploymentRepo) ListByUser(userID string) ([]repository.Deployment, err
 			&deployment.Error,
 			&deployment.CreatedAt,
 			&deployment.UpdatedAt,
+			&deployment.LiveUrl,
 		)
 		if err != nil {
 			return nil, err
@@ -150,7 +153,8 @@ func (r *DeploymentRepo) ListByStatus(status string) ([]repository.Deployment, e
 			COALESCE(env_json, '{}'),
 			COALESCE(error, ''),
 			created_at,
-			updated_at FROM deployments
+			updated_at,
+			COALESCE(live_url, '') FROM deployments
 			WHERE status=?`, status)
 	if err != nil {
 		return nil, err
@@ -175,6 +179,7 @@ func (r *DeploymentRepo) ListByStatus(status string) ([]repository.Deployment, e
 			&deployment.Error,
 			&deployment.CreatedAt,
 			&deployment.UpdatedAt,
+			&deployment.LiveUrl,
 		)
 		if err != nil {
 			return nil, err
@@ -201,7 +206,8 @@ func (r *DeploymentRepo) GetAll() ([]repository.Deployment, error) {
 			COALESCE(env_json, '{}'),
 			COALESCE(error, ''),
 			created_at,
-			updated_at FROM deployments
+			updated_at,
+			COALESCE(live_url, '') FROM deployments
 			`)
 	if err != nil {
 		return nil, err
@@ -226,6 +232,7 @@ func (r *DeploymentRepo) GetAll() ([]repository.Deployment, error) {
 			&deployment.Error,
 			&deployment.CreatedAt,
 			&deployment.UpdatedAt,
+			&deployment.LiveUrl,
 		)
 		if err != nil {
 			return nil, err
@@ -247,11 +254,12 @@ func (r *DeploymentRepo) GetByContainerId(containerID string) (*repository.Deplo
 		        COALESCE(container_id, ''), COALESCE(image_tag, ''),
 		        COALESCE(host_port, 0), COALESCE(container_port, 0), 
 		        tier_name, COALESCE(tier_cpu, 0.0), COALESCE(tier_memory, ''),
-		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at
+		        COALESCE(env_json, '{}'), COALESCE(error, ''), created_at, updated_at,
+		        COALESCE(live_url, '')
          FROM deployments WHERE container_id = ?`, containerID,
 	).Scan(&d.ID, &d.UserID, &d.RepoURL, &d.Status, &d.ContainerID,
 		&d.ImageTag, &d.HostPort, &d.ContainerPort, &d.TierName,
-		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt)
+		&d.TierCPU, &d.TierMemory, &d.EnvJSON, &d.Error, &d.CreatedAt, &d.UpdatedAt, &d.LiveUrl)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

@@ -195,16 +195,20 @@ func (h *State) Deploy(userId string, jobId string, logBus *types.LogBus, req *t
 	})
 	//-----------15. Update container status in database---------
 
-	err = h.Repo.Deployments.UpdateStatus(jobId, types.DeployRunning, cfg.Name, tag, hostPort, containerPort)
-	if err != nil {
-		log.Printf("[pipeline] error updating status in DB: %v", err)
-	}
+	// err = h.Repo.Deployments.UpdateStatus(jobId, types.DeployRunning, cfg.Name, tag, hostPort, containerPort, appUrl)
+	// if err != nil {
+	// 	log.Printf("[pipeline] error updating status in DB: %v", err)
+	// }
 	//-------------16. Container Url-------------------
 	Url := fmt.Sprintf("http://localhost:%d", hostPort)
 	appUrl, err := AddRoute(jobId, Url)
 	if err != nil {
 		cleanupWithContainer()
 		return handleFailure(err)
+	}
+	err = h.Repo.Deployments.UpdateStatus(jobId, types.DeployRunning, cfg.Name, tag, hostPort, containerPort, appUrl)
+	if err != nil {
+		log.Printf("[pipeline] error updating status in DB: %v", err)
 	}
 	emit_event := func(event, data string) {
 		select {

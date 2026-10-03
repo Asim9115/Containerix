@@ -9,6 +9,7 @@ type Deployment struct {
     ID            string
     UserID        string
     RepoURL       string
+    LiveUrl       string
     Status        string
     ContainerID   string
     ImageTag      string
@@ -53,7 +54,7 @@ type DeploymentRepo interface {
     Create(d *Deployment) error
     GetByID(id string) (*Deployment, error)
     ListByUser(userID string) ([]Deployment, error)
-    UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int) error
+    UpdateStatus(id, status, containerID, imageTag string, hostPort, containerPort int, liveUrl string) error
     UpdateError(id, status, errMsg string) error
     Delete(id string) error
     DeleteByContainerID(containerID string) error
